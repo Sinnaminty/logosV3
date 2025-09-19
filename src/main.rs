@@ -1,43 +1,68 @@
-use serenity::model::channel::Message;
-use serenity::prelude::*;
-use serenity::{async_trait, json};
+use clap::Parser;
+use poise::serenity_prelude as serenity;
+use utils::ResultExt;
+mod utils;
 
-struct Handler;
+#[derive(Debug)]
+struct Data {} // User data, which is stored and accessible in all command invocations
 
-#[derive(serde::Deserialize)]
-struct APIKey {
-    token: String,
+type Error = Box<dyn std::error::Error + Send + Sync>;
+type Context<'a> = poise::Context<'a, Data, Error>;
+
+/// Displays your or another user's account creation date
+#[poise::command(slash_command)]
+async fn age(
+    ctx: Context<'_>,
+    #[description = "Selected user"] user: Option<serenity::User>,
+) -> Result<(), Error> {
+    let u = user.as_ref().unwrap_or_else(|| ctx.author());
+    let response = format!("{}'s account was created at {}", u.name, u.created_at());
+    ctx.say(response).await?;
+    Ok(())
 }
 
-#[async_trait]
-impl EventHandler for Handler {
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!ping" {
-            if let Err(why) = msg.channel_id.say(&ctx.http, "Pong!").await {
-                println!("Error sending message: {why:?}");
-            }
-        }
-    }
+#[poise::command(context_menu_command = "Echo", slash_command)]
+pub async fn echo(
+    ctx: Context<'_>,
+    #[description = "Message to echo (enter a link or ID)"] msg: serenity::Message,
+) -> Result<(), Error> {
+    ctx.say(&msg.content).await?;
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() {
-    let file_contents = std::fs::read_to_string("s.json").expect("Failed to read token file");
-    let api_key: APIKey = serenity::json::from_str(file_contents).unwrap();
-    let token = api_key.token;
-    // Set gateway intents, which decides what events the bot will be notified about
-    let intents = GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+    utils::setup_logging(utils::Args::parse().log_level);
 
-    // Create a new instance of the Client, logging in as a bot.
-    let mut client = Client::builder(&token, intents)
-        .event_handler(Handler)
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
+            commands: vec![age(), echo()],
+            on_error: |error| {
+                Box::pin(async move {
+                    match error {
+                        poise::FrameworkError::Command { error, ctx, .. } => {
+                            let _ = ctx.say(format!("Error in command: {error}")).await;
+                        }
+                        other => {
+                            log::error!("Framework error: {:#?}", other);
+                        }
+                    }
+                })
+            },
+            ..Default::default()
+        })
+        .setup(|ctx, _ready, framework| {
+            Box::pin(async move {
+                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                Ok(Data {})
+            })
+        })
+        .build();
+
+    let mut client = serenity::ClientBuilder::new(utils::get_api_token(), utils::INTENTS)
+        .framework(framework)
         .await
-        .expect("Err creating client");
+        .unwrap_or_log();
 
-    // Start listening for events by starting a single shard
-    if let Err(why) = client.start().await {
-        println!("Client error: {why:?}");
-    }
+    client.start().await.unwrap_or_log();
 }
