@@ -13,4 +13,4 @@ simple_logger = "5.0.0"
 tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
 
 [lints.clippy]
-pedantic = "warn"
+#pedantic = "warn"
