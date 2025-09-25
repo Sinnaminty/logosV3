@@ -4,6 +4,7 @@ use poise::serenity_prelude as serenity;
 use utils::ResultExt;
 mod commands;
 mod framework;
+mod handlers;
 mod logging;
 mod setup;
 mod types;

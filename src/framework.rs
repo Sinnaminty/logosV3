@@ -1,11 +1,12 @@
 use crate::commands;
+use crate::handlers;
 use crate::types::{Data, Error};
 
 pub fn setup_framework() -> poise::Framework<Data, Error> {
     poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: commands::return_commands(),
-            on_error: commands::error_handler,
+            on_error: handlers::error_handler,
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some(String::from("!")),
                 ..Default::default()
