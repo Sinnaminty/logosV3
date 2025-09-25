@@ -2,11 +2,13 @@ use crate::{
     types::{self, Context, Data, Error},
     utils,
 };
+
+use log::warn;
 use poise::{FrameworkError, serenity_prelude as serenity};
 use std::pin::Pin;
 
 pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
-    vec![oot()]
+    vec![oot(), pfp(), register()]
 }
 
 #[poise::command(slash_command, subcommands("add"), subcommand_required)]
@@ -65,6 +67,30 @@ pub async fn age(
     let u = user.as_ref().unwrap_or_else(|| ctx.author());
     let response = format!("{}'s account was created at {}", u.name, u.created_at());
     ctx.say(response).await?;
+    Ok(())
+}
+
+/// Displays the calling users' profile picture
+#[poise::command(slash_command)]
+pub async fn pfp(
+    ctx: Context<'_>,
+    #[description = "User to show pfp of"] user: serenity::User,
+) -> Result<(), Error> {
+    let ce = utils::create_embed_builder(
+        "pfp",
+        format!("{}'s pfp", &user.name),
+        types::EmbedType::Neutral,
+    )
+    .image(user.avatar_url().unwrap()); //WARN: this is hot garbage. please change
+    let r = poise::reply::CreateReply::default().embed(ce);
+    ctx.send(r).await?;
+    Ok(())
+}
+
+#[poise::command(prefix_command)]
+pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
+    poise::builtins::register_application_commands_buttons(ctx).await?;
+    log::warn!("Debug register command called!!!");
     Ok(())
 }
 

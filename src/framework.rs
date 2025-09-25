@@ -6,6 +6,10 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
         .options(poise::FrameworkOptions {
             commands: commands::return_commands(),
             on_error: commands::error_handler,
+            prefix_options: poise::PrefixFrameworkOptions {
+                prefix: Some(String::from("!")),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
