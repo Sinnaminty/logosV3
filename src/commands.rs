@@ -70,6 +70,7 @@ pub async fn age(
     Ok(())
 }
 
+// NOTE: add the ability to grab both global pfp and guild.
 /// Displays the calling users' profile picture
 #[poise::command(slash_command)]
 pub async fn pfp(
@@ -81,7 +82,11 @@ pub async fn pfp(
         format!("{}'s pfp", &user.name),
         types::EmbedType::Neutral,
     )
-    .image(user.avatar_url().unwrap()); //WARN: this is hot garbage. please change
+    .image(user.avatar_url().unwrap_or_else(|| {
+        log::warn!("Slash Command Error: pfp: user.avatar_url() is None.");
+        user.default_avatar_url()
+    }));
+
     let r = poise::reply::CreateReply::default().embed(ce);
     ctx.send(r).await?;
     Ok(())
