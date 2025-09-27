@@ -1,13 +1,15 @@
 use crate::{
     commands::oot::*,
+    commands::vox::*,
     types::{Context, Data, EmbedType, Error, Reply},
     utils,
 };
 mod oot;
+mod vox;
 use poise::serenity_prelude as serenity;
 
 pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
-    vec![oot(), pfp(), register()]
+    vec![oot(), pfp(), register(), vox()]
 }
 
 // NOTE: add the ability to grab both global pfp and guild.

@@ -7,6 +7,7 @@ mod framework;
 mod handlers;
 mod logging;
 mod setup;
+mod tts_dectalk;
 mod types;
 mod utils;
 
@@ -22,6 +23,8 @@ pub struct Args {
 #[tokio::main]
 async fn main() {
     setup::setup_logging(Args::parse().log_level);
+
+    //FIXME: change this maybe? i'd like to obscure this setup.
 
     let framework = setup::setup_framework();
 
