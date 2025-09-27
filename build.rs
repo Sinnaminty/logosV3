@@ -30,6 +30,6 @@ fn main() {
 
     // Optional (Linux): embed an rpath so the binary can find libtts.so at runtime.
     // Comment out if you prefer exporting LD_LIBRARY_PATH instead.
-    //#[cfg(target_os = "linux")]
-    //println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../vendor/dectalk/dist");
+    #[cfg(target_os = "linux")]
+    println!("cargo:rustc-link-arg=-Wl,-rpath,/home/fizz/repos/logosV3/vendor/dectalk/dist");
 }

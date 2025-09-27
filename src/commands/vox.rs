@@ -1,4 +1,7 @@
-use crate::types::{Context, Error};
+use crate::{
+    dectalk::{Dectalk, WaveFormat},
+    types::{Context, Error},
+};
 use poise::serenity_prelude as serenity;
 
 #[poise::command(slash_command, subcommands("say"), subcommand_required)]
@@ -22,7 +25,7 @@ pub async fn say(
         };
 
         // Create and use DECtalk entirely on this blocking thread.
-        let tts = crate::tts_dectalk::Dectalk::new()?;
+        let tts = Dectalk::new()?;
 
         if let Some(l) = language {
             let _ = tts.set_language(l);
@@ -44,7 +47,8 @@ pub async fn say(
 
         // Synthesize to WAV via DECtalk API
 
-        tts.speak_to_wav(&text, &p, 0)?;
+        // NOTE: 4 = mono 16 11kHz
+        tts.speak_to_wav(&text, &p, WaveFormat::DT_1M16)?;
 
         Ok(p)
     })

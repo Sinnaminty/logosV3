@@ -3,11 +3,11 @@ use log::LevelFilter;
 use poise::serenity_prelude as serenity;
 use utils::ResultExt;
 mod commands;
+mod dectalk;
 mod framework;
 mod handlers;
 mod logging;
 mod setup;
-mod tts_dectalk;
 mod types;
 mod utils;
 

@@ -6,12 +6,13 @@ use std::{ffi::CString, path::Path, ptr};
 // Generated in build.rs as OUT_DIR/dectalk_bindings.rs
 include!(concat!(env!("OUT_DIR"), "/dectalk_bindings.rs"));
 
-#[inline]
+#[track_caller]
 fn check_mm(code: MMRESULT) -> Result<()> {
     if code == 0 {
         Ok(())
     } else {
-        Err(anyhow!("DECtalk MMRESULT {}", code))
+        let loc = std::panic::Location::caller();
+        Err(anyhow!("DECtalk MMRESULT {}: {}", code, loc))
     }
 }
 
@@ -20,11 +21,23 @@ pub struct Dectalk {
     handle: LPTTS_HANDLE_T,
 }
 
+pub enum WaveFormat {
+    ///  Mono 8-bit, 11.025 kHz sample rate
+    DT_1M08 = 1,
+    ///  Mono 16-bit, 11.025 kHz sample rate
+    DT_1M16 = 4,
+    /// Mono 8-bit, m-law 8 kHz sample rate
+    DT_08M08 = 0x1000,
+}
+
+pub enum DeviceOptions {}
+
 impl Dectalk {
     /// Start DECtalk. Uses no window/callback and default device options.
     /// For headless use (WAV/memory output), we keep device options at 0 and
     /// direct output to a wave file using `TextToSpeechOpenWaveOutFile`.
     pub fn new() -> Result<Self> {
+        log::debug!("Dectalk::new()");
         let mut h: LPTTS_HANDLE_T = ptr::null_mut();
         let rc = unsafe { TextToSpeechStartup(&mut h as *mut LPTTS_HANDLE_T, 0, 0, None, 0) };
         check_mm(rc)?;
@@ -50,7 +63,12 @@ impl Dectalk {
 
     /// Write synthesized audio directly to a WAV file on disk.
     /// `format` is a DECtalk wave format code; 0 typically selects a default.
-    pub fn speak_to_wav(&self, text: &str, out_path: impl AsRef<Path>, format: u32) -> Result<()> {
+    pub fn speak_to_wav(
+        &self,
+        text: &str,
+        out_path: impl AsRef<Path>,
+        format: WaveFormat,
+    ) -> Result<()> {
         // Open the wave file output
         let cpath = CString::new(out_path.as_ref().to_string_lossy().as_bytes())?;
         check_mm(unsafe {
