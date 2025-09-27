@@ -1,5 +1,6 @@
-use crate::types::EmbedType;
+use crate::types::{Embed, EmbedType};
 use poise::serenity_prelude::{self as serenity};
+
 /// this is a trait!!
 pub trait ResultExt<T, E> {
     /// Unwraps the result, logging the error and panicking if it's an Err.
@@ -22,8 +23,8 @@ pub fn create_embed_builder(
     title: impl Into<String>,
     description: impl Into<String>,
     embed_type: EmbedType,
-) -> serenity::builder::CreateEmbed {
-    serenity::builder::CreateEmbed::new()
+) -> Embed {
+    Embed::new()
         .title(title)
         .description(description)
         .timestamp(serenity::Timestamp::now())

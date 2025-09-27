@@ -1,5 +1,5 @@
 use crate::{
-    types::{Context, EmbedType, Error},
+    types::{Context, EmbedType, Error, Reply},
     utils,
 };
 use poise::serenity_prelude as serenity;
@@ -16,33 +16,25 @@ pub async fn add(
     ctx: Context<'_>,
     #[description = "Select your json."] file: serenity::Attachment,
 ) -> Result<(), Error> {
-    if !(file
+    let is_json = file
         .content_type
         .as_ref()
-        .is_some_and(|v| v.starts_with("application/json")))
-    {
-        let ce = utils::create_embed_builder(
+        .is_some_and(|ct| ct.starts_with("application/json"));
+
+    if !is_json {
+        let embed = utils::create_embed_builder(
             "OoT Add",
-            "The file you provided is not a json file.",
+            "the file you provided is not a JSON file.",
             EmbedType::Bad,
         );
-        let r = poise::reply::CreateReply::default().embed(ce);
-        ctx.send(r).await?;
+        ctx.send(Reply::default().embed(embed)).await?;
         return Ok(());
     }
 
-    let ce = utils::create_embed_builder(
-        "OoT Add",
-        format!(
-            "File name: **{}**.\n Content type: **{}**",
-            file.filename,
-            file.content_type.unwrap_or(String::from("N/A"))
-        ),
-        EmbedType::Good,
-    );
-    let r = poise::reply::CreateReply::default().embed(ce);
+    let embed = utils::create_embed_builder("OoT Add", "meow", EmbedType::Good);
 
-    ctx.send(r).await?;
+    ctx.send(Reply::default().embed(embed)).await?;
+
     Ok(())
 }
 
