@@ -19,11 +19,17 @@ fn main() {
         .expect("could not write bindings");
 
     // Tell rustc where the shared libs live, and that we link against libtts.so
-    println!("cargo:rustc-link-search=native={}", "vendor/dectalk/dist");
-    println!("cargo:rustc-link-lib=tts");
+    println!("cargo:rustc-link-search=native=vendor/dectalk/dist");
+    println!("cargo:rustc-link-lib=static=tts");
+    println!("cargo:rustc-link-lib=static=tts_fr");
+    println!("cargo:rustc-link-lib=static=tts_gr");
+    println!("cargo:rustc-link-lib=static=tts_la");
+    println!("cargo:rustc-link-lib=static=tts_sp");
+    println!("cargo:rustc-link-lib=static=tts_uk");
+    println!("cargo:rustc-link-lib=static=tts_us");
 
     // Optional (Linux): embed an rpath so the binary can find libtts.so at runtime.
     // Comment out if you prefer exporting LD_LIBRARY_PATH instead.
     #[cfg(target_os = "linux")]
-    println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../vendor/dectalk/dist");
+    println!("cargo:rustc-link-arg=-Wl,-rpath,/home/fizz/repos/logosV3/vendor/dectalk/dist");
 }
