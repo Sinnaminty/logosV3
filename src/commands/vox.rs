@@ -14,8 +14,6 @@ pub async fn vox(_: Context<'_>) -> Result<(), Error> {
 pub async fn say(
     ctx: Context<'_>,
     #[description = "Text to synthesize"] text: String,
-    #[description = "Speaker ID (numeric, optional)"] speaker: Option<u32>,
-    #[description = "Language code (e.g. 1=US English)"] language: Option<u32>,
     #[description = "Words per minute"] rate: Option<u32>,
 ) -> Result<(), Error> {
     let path = tokio::task::spawn_blocking(move || -> Result<std::path::PathBuf, Error> {
@@ -27,12 +25,6 @@ pub async fn say(
         // Create and use DECtalk entirely on this blocking thread.
         let tts = Dectalk::new()?;
 
-        if let Some(l) = language {
-            let _ = tts.set_language(l);
-        }
-        if let Some(s) = speaker {
-            let _ = tts.set_speaker(s);
-        }
         if let Some(r) = rate {
             let _ = tts.set_rate(r);
         }

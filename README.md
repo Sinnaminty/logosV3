@@ -4,15 +4,18 @@
 
 ---
 
-## Building the Project 
+## Building the Project
+
 ```bash
-cargo build --release
+docker build -t logos-bot:latest .
 ```
 
-## Running the Bot 
+## Running the Bot
+
 ```bash
-cargo run --release
+docker run -d --name logos --restart unless-stopped logos-bot:latest
 ```
+
 ---
 
-###### Powered by caffeine and lambda functions.
+###### Powered by caffeine and lambda functions

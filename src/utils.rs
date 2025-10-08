@@ -1,18 +1,20 @@
+use std::fmt::Display;
+
 use crate::types::{Embed, EmbedType};
 use poise::serenity_prelude::{self as serenity};
 
 /// this is a trait!!
 pub trait ResultExt<T, E> {
     /// Unwraps the result, logging the error and panicking if it's an Err.
-    fn unwrap_or_log(self) -> T;
+    fn unwrap_or_log(self, from: impl Display) -> T;
 }
 
 impl<T, E: std::fmt::Display> ResultExt<T, E> for Result<T, E> {
-    fn unwrap_or_log(self) -> T {
+    fn unwrap_or_log(self, from: impl Display) -> T {
         match self {
             Ok(v) => v,
             Err(e) => {
-                log::error!("Unrecoverable error: {e}");
+                log::error!("Unrecoverable error from {from}: {e}");
                 panic!();
             }
         }

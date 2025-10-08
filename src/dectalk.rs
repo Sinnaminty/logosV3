@@ -22,15 +22,13 @@ pub struct Dectalk {
 }
 
 pub enum WaveFormat {
-    ///  Mono 8-bit, 11.025 kHz sample rate
-    DT_1M08 = 1,
+    //  Mono 8-bit, 11.025 kHz sample rate
+    //    DT_1M08 = 1,
     ///  Mono 16-bit, 11.025 kHz sample rate
     DT_1M16 = 4,
-    /// Mono 8-bit, m-law 8 kHz sample rate
-    DT_08M08 = 0x1000,
+    // Mono 8-bit, m-law 8 kHz sample rate
+    //   DT_08M08 = 0x1000,
 }
-
-pub enum DeviceOptions {}
 
 impl Dectalk {
     /// Start DECtalk. Uses no window/callback and default device options.
