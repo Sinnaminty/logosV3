@@ -1,21 +1,22 @@
-########## Builder ##########
-FROM rust:1.90-bookworm AS builder
-
+########## Chef it up! ##########
+FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
 WORKDIR /app
 
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
 # Bindgen / libclang for build.rs
 RUN apt-get update && apt-get install -y \
     clang llvm-dev libclang-dev pkg-config build-essential ca-certificates \
-
     && rm -rf /var/lib/apt/lists/*
 
-#  Cache deps
-COPY Cargo.toml Cargo.lock ./
-# Warm the cache with a dummy main so dependency compile is cached
-RUN mkdir -p src && echo 'fn main(){}' > src/main.rs && \
-    cargo build --release || true
+COPY --from=planner /app/recipe.json recipe.json
 
-# Copy the rest of the source tree (including your src/, s.json, etc.)
+# cache build dependencies
+RUN cargo chef cook --release --recipe-path recipe.json
+
 COPY . .
 # rebuild real binary
 RUN cargo build --release
