@@ -31,8 +31,8 @@ async fn main() {
     let mut client = serenity::ClientBuilder::new(setup::get_api_token(), setup::INTENTS)
         .framework(framework)
         .await
-        .unwrap_or_log();
+        .unwrap_or_log("main::client");
 
     // lovely jubly!
-    client.start().await.unwrap_or_log();
+    client.start().await.unwrap_or_log("main::start");
 }
