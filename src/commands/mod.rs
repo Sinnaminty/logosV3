@@ -1,9 +1,11 @@
 use crate::{
+    commands::mimic::*,
     commands::oot::*,
     commands::vox::*,
     types::{Context, Data, EmbedType, Error, Reply},
     utils,
 };
+mod mimic;
 mod oot;
 mod vox;
 use poise::serenity_prelude as serenity;
