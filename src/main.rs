@@ -7,6 +7,7 @@ mod dectalk;
 mod framework;
 mod handlers;
 mod logging;
+mod mimic_db;
 mod setup;
 mod types;
 mod utils;

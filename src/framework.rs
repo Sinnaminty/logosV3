@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::commands;
 use crate::handlers;
 use crate::types::{Data, Error};
@@ -16,7 +18,9 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(Data {})
+                Ok(Data {
+                    mimic_db: default(),
+                })
             })
         })
         .build()

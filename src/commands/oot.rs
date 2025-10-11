@@ -4,7 +4,7 @@ use crate::{
 };
 use poise::serenity_prelude as serenity;
 
-#[poise::command(slash_command, subcommands("add"), subcommand_required)]
+#[poise::command(slash_command, subcommands("add"))]
 pub async fn oot(_: Context<'_>) -> Result<(), Error> {
     //lmao
     panic!();

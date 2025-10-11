@@ -11,7 +11,7 @@ mod vox;
 use poise::serenity_prelude as serenity;
 
 pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
-    vec![oot(), pfp(), register(), vox()]
+    vec![oot(), pfp(), register(), vox(), mimic()]
 }
 
 // NOTE: add the ability to grab both global pfp and guild.
