@@ -1,10 +1,30 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
-
-use anyhow::{Result, anyhow};
+use crate::types::Result;
 use std::{ffi::CString, path::Path, ptr};
-
 // Generated in build.rs as OUT_DIR/dectalk_bindings.rs
 include!(concat!(env!("OUT_DIR"), "/dectalk_bindings.rs"));
+
+#[derive(Debug)]
+enum DectalkError {
+    MmError {
+        error_code: MMRESULT,
+        loc: std::panic::Location<'static>,
+    },
+    NullHandleError,
+}
+
+impl std::fmt::Display for DectalkError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DectalkError::MmError { error_code, loc } => {
+                write!(f, "DectalkMmError {} at {}", error_code, loc)
+            }
+            DectalkError::NullHandleError => write!(f, "DectalkNullHandleError"),
+        }
+    }
+}
+
+impl std::error::Error for DectalkError {}
 
 #[track_caller]
 fn check_mm(code: MMRESULT) -> Result<()> {
@@ -12,7 +32,12 @@ fn check_mm(code: MMRESULT) -> Result<()> {
         Ok(())
     } else {
         let loc = std::panic::Location::caller();
-        Err(anyhow!("DECtalk MMRESULT {}: {}", code, loc))
+
+        let e = DectalkError::MmError {
+            error_code: (code),
+            loc: (*loc),
+        };
+        Err(Box::new(e))
     }
 }
 
@@ -40,7 +65,7 @@ impl Dectalk {
         let rc = unsafe { TextToSpeechStartup(&mut h as *mut LPTTS_HANDLE_T, 0, 0, None, 0) };
         check_mm(rc)?;
         if h.is_null() {
-            return Err(anyhow!("TextToSpeechStartup returned null handle"));
+            return Err(Box::new(DectalkError::NullHandleError));
         }
         Ok(Self { handle: h })
     }

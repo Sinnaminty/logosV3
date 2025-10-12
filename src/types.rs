@@ -9,8 +9,14 @@ pub struct Mimic {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MimicUser {
+    pub active_mimic: Option<Mimic>,
+    pub mimics: Vec<Mimic>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MimicDB {
-    db: HashMap<serenity::UserId, Vec<Mimic>>,
+    db: HashMap<serenity::UserId, MimicUser>,
 }
 
 #[derive(Debug)]
