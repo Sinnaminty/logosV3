@@ -4,7 +4,7 @@ use crate::{
     utils,
 };
 
-use poise::serenity_prelude::{self as serenity, ExecuteWebhook};
+use poise::serenity_prelude::{self as serenity, AutocompleteChoice, ExecuteWebhook};
 
 #[poise::command(slash_command, subcommands("add", "list", "delete", "set", "say"))]
 pub async fn mimic(_ctx: Context<'_>) -> Result {
@@ -44,9 +44,7 @@ pub async fn add(
     };
 
     mimic_user.add_mimic(m.clone());
-    if mimic_user.active_mimic.is_none() {
-        mimic_user.active_mimic = Some(m);
-    }
+    mimic_user.active_mimic = Some(m);
 
     let embed = utils::create_embed_builder(
         "Mimic Add",
@@ -85,7 +83,7 @@ pub async fn list(ctx: Context<'_>) -> Result {
 }
 
 /// /mimic delete — remove a mimic
-#[poise::command(slash_command, guild_only)]
+#[poise::command(slash_command)]
 pub async fn delete(
     ctx: Context<'_>,
     #[description = "Mimic name to delete"] name: String,
@@ -94,16 +92,57 @@ pub async fn delete(
 }
 
 /// /mimic set — sets your active mimic
-#[poise::command(slash_command, guild_only)]
-pub async fn set(
-    ctx: Context<'_>,
-    #[description = "Mimic name to activate"] name: String,
-) -> Result {
-    todo!();
+#[poise::command(slash_command)]
+pub async fn set(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: String) -> Result {
+    let mutex_db = &ctx.data().mimic_db;
+
+    let mut g = mutex_db.lock().await;
+
+    let mimic_user = g.get_user(ctx.author().id);
+
+    let mimics = mimic_user.mimics.clone();
+
+    let Some(selected_mimic) = mimics.into_iter().filter(|m| m.name.eq(&name)).next_back() else {
+        let embed =
+            utils::create_embed_builder("Mimic Set", "Could not find that mimic!", EmbedType::Bad);
+        ctx.send(Reply::default().embed(embed)).await?;
+        //FIXME: i need to implement correct errors for these things.
+        return Ok(());
+    };
+
+    mimic_user.active_mimic = Some(selected_mimic.clone());
+    let embed = utils::create_embed_builder(
+        "Mimic Set",
+        format!("Your active mimic is set to {}", selected_mimic.name),
+        EmbedType::Good,
+    );
+
+    ctx.send(Reply::default().embed(embed)).await?;
+    Ok(())
+}
+
+async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
+    let all_mimics = ctx
+        .data()
+        .mimic_db
+        .lock()
+        .await
+        .get_user(ctx.author().id)
+        .mimics
+        .clone();
+
+    let all_mimic_names = all_mimics.into_iter().map(|m| m.name);
+
+    let suggestions: Vec<AutocompleteChoice> = all_mimic_names
+        .filter(|i| i.starts_with(partial))
+        .map(|i| AutocompleteChoice::new(i.to_string(), i.to_string()))
+        .collect();
+
+    suggestions
 }
 
 /// /mimic say — speak as your active mimic in this channel
-#[poise::command(slash_command, guild_only)]
+#[poise::command(slash_command)]
 pub async fn say(
     ctx: Context<'_>,
     #[description = "What should your mimic say?"] text: String,
@@ -125,6 +164,7 @@ pub async fn say(
         );
         ctx.send(Reply::default().embed(embed).ephemeral(true))
             .await?;
+        //TODO: find ephemeral message and delete it
         return Ok(());
     };
 
@@ -143,5 +183,6 @@ pub async fn say(
     w.execute(ctx.http(), false, builder).await?;
     ctx.send(Reply::default().ephemeral(true).content("sent~"))
         .await?;
-    Ok(())
+
+    ctx.Ok(())
 }
