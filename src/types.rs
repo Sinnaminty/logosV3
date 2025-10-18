@@ -1,6 +1,7 @@
-use poise::serenity_prelude::{self as serenity, GatewayIntents};
+use poise::serenity_prelude::{self as serenity, GatewayIntents, UserId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mimic {
@@ -8,7 +9,7 @@ pub struct Mimic {
     pub avatar_url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MimicUser {
     pub active_mimic: Option<Mimic>,
     pub mimics: Vec<Mimic>,
@@ -19,9 +20,16 @@ pub struct MimicDB {
     db: HashMap<serenity::UserId, MimicUser>,
 }
 
+impl MimicDB {
+    /// returns the MimicUser stored inside of the Db. will create a new MimicUser entry if the
+    /// userID is not found inside of the Db.
+    pub fn get_user(&mut self, user: UserId) -> &mut MimicUser {
+        self.db.entry(user).or_default()
+    }
+}
 #[derive(Debug)]
 pub struct Data {
-    pub mimic_db: MimicDB,
+    pub mimic_db: Mutex<MimicDB>,
 } // User data, which is stored and accessible in all command invocations
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;

@@ -1,5 +1,10 @@
-use crate::types::{Context, Mimic, Result};
-use poise::serenity_prelude as serenity;
+use crate::{
+    mimic_db::get_or_create_webhook,
+    types::{Context, Embed, EmbedType, Mimic, Reply, Result},
+    utils,
+};
+
+use poise::serenity_prelude::{self as serenity, ExecuteWebhook};
 
 #[poise::command(slash_command, subcommands("add", "list", "delete", "set", "say"))]
 pub async fn mimic(_ctx: Context<'_>) -> Result {
@@ -26,22 +31,57 @@ pub async fn add(
         let chosen_avatar = att_url.or(avatar_url);
         (chosen_name, chosen_avatar)
     };
-    let data = ctx.data();
-    let mimic_user = data.mimic_db.get_user(user);
+
+    let mutex_db = &ctx.data().mimic_db;
+
+    let mut g = mutex_db.lock().await;
+
+    let mimic_user = g.get_user(user);
 
     let m = Mimic {
         name: final_name.clone(),
         avatar_url: final_avatar,
     };
 
-    mimic_user.add_mimic(&m);
+    mimic_user.add_mimic(m.clone());
+    if mimic_user.active_mimic.is_none() {
+        mimic_user.active_mimic = Some(m);
+    }
+
+    let embed = utils::create_embed_builder(
+        "Mimic Add",
+        format!("Success! Your mimic {} has been added :3c", final_name),
+        EmbedType::Good,
+    );
+    ctx.send(Reply::default().embed(embed)).await?;
     Ok(())
 }
 
 /// /mimic list — shows all mimics, marks the active one
 #[poise::command(slash_command)]
 pub async fn list(ctx: Context<'_>) -> Result {
-    todo!();
+    let mimic_user = ctx
+        .data()
+        .mimic_db
+        .lock()
+        .await
+        .get_user(ctx.author().id)
+        .clone();
+
+    let r = mimic_user
+        .mimics
+        .into_iter()
+        .map(|m| {
+            let mut embed = Embed::new().title(m.name);
+            if let Some(url) = m.avatar_url {
+                embed = embed.image(url);
+            }
+            embed
+        })
+        .fold(Reply::default(), |r, e| r.embed(e));
+
+    ctx.send(r).await?;
+    Ok(())
 }
 
 /// /mimic delete — remove a mimic
@@ -63,11 +103,45 @@ pub async fn set(
 }
 
 /// /mimic say — speak as your active mimic in this channel
-
 #[poise::command(slash_command, guild_only)]
 pub async fn say(
     ctx: Context<'_>,
     #[description = "What should your mimic say?"] text: String,
 ) -> Result {
-    todo!();
+    let active_mimic = ctx
+        .data()
+        .mimic_db
+        .lock()
+        .await
+        .get_user(ctx.author().id)
+        .active_mimic
+        .clone();
+
+    let Some(active_mimic) = active_mimic else {
+        let embed = utils::create_embed_builder(
+            "Mimic Say",
+            "You have no active Mimic set!",
+            EmbedType::Bad,
+        );
+        ctx.send(Reply::default().embed(embed).ephemeral(true))
+            .await?;
+        return Ok(());
+    };
+
+    let w = get_or_create_webhook(ctx.http(), ctx.channel_id())
+        .await
+        .unwrap();
+
+    let mut builder = ExecuteWebhook::new()
+        .content(text)
+        .username(active_mimic.name);
+
+    if let Some(s) = active_mimic.avatar_url {
+        builder = builder.avatar_url(s);
+    }
+
+    w.execute(ctx.http(), false, builder).await?;
+    ctx.send(Reply::default().ephemeral(true).content("sent~"))
+        .await?;
+    Ok(())
 }
