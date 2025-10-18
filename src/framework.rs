@@ -6,10 +6,11 @@ use poise::serenity_prelude as serenity;
 use tokio::sync::Mutex;
 
 pub fn setup_framework() -> poise::Framework<Data, Error> {
+    //TODO: add db saving.
     let mimic_db = std::fs::read_to_string("data.json").map(serenity::json::from_str::<MimicDB>);
     let db = match mimic_db {
         Ok(Ok(db)) => db,
-        Ok(Err(e)) => panic!("file is there but.. serializtion failed? what."), //* serializaiton failed!
+        Ok(Err(e)) => panic!("file is there but.. serializtion failed? {e}"), //* serializaiton failed!
         Err(_) => Default::default(),
     };
 
