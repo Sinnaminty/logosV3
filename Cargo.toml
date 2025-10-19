@@ -16,6 +16,7 @@ hound = "3"                                                              # For W
 sled = "0.34"
 parking_lot = "0.12.5"
 serde_json = "1.0.145"
+thiserror = "2.0.17"
 
 [build-dependencies]
 bindgen = "0.72.1"

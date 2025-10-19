@@ -3,7 +3,31 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use crate::dectalk::DectalkError;
+
+pub enum PersistantData {
+    MimicDB(MimicDB),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum LogosErrors {
+    #[error("SerenityError: {0}")]
+    Serenity(#[from] poise::serenity_prelude::Error),
+
+    #[error("ffiError: {0}")]
+    FfiNul(#[from] std::ffi::NulError),
+
+    #[error("tokio::JoinError: {0}")]
+    TokioJoin(#[from] tokio::task::JoinError),
+
+    #[error("DectalkError: {0}")]
+    Dectalk(#[from] DectalkError),
+
+    #[error("std::io: {0}")]
+    StdIo(#[from] std::io::Error),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Mimic {
     pub name: String,
     pub avatar_url: Option<String>,
@@ -27,12 +51,14 @@ impl MimicDB {
         self.db.entry(user).or_default()
     }
 }
+
 #[derive(Debug)]
 pub struct Data {
     pub mimic_db: Mutex<MimicDB>,
+    pub persistant_data_channel: tokio::sync::mpsc::Sender<PersistantData>,
 } // User data, which is stored and accessible in all command invocations
 
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Error = LogosErrors;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 pub type Embed = serenity::builder::CreateEmbed;
 pub type Reply = poise::reply::CreateReply;

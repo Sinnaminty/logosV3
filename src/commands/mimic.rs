@@ -6,6 +6,25 @@ use crate::{
 
 use poise::serenity_prelude::{self as serenity, AutocompleteChoice, ExecuteWebhook};
 
+async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
+    let all_mimics = ctx
+        .data()
+        .mimic_db
+        .lock()
+        .await
+        .get_user(ctx.author().id)
+        .mimics
+        .clone();
+
+    let all_mimic_names = all_mimics.into_iter().map(|m| m.name);
+    let suggestions: Vec<AutocompleteChoice> = all_mimic_names
+        .filter(|i| i.starts_with(partial))
+        .map(|i| AutocompleteChoice::new(i.to_string(), i.to_string()))
+        .collect();
+
+    suggestions
+}
+
 #[poise::command(slash_command, subcommands("add", "list", "delete", "set", "say"))]
 pub async fn mimic(_ctx: Context<'_>) -> Result {
     Ok(())
@@ -84,11 +103,40 @@ pub async fn list(ctx: Context<'_>) -> Result {
 
 /// /mimic delete — remove a mimic
 #[poise::command(slash_command)]
-pub async fn delete(
-    ctx: Context<'_>,
-    #[description = "Mimic name to delete"] name: String,
-) -> Result {
-    todo!();
+pub async fn delete(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: String) -> Result {
+    let db = &ctx.data().mimic_db;
+    let mut g = db.lock().await;
+    let mimic_user = g.get_user(ctx.author().id);
+
+    let Some((index, selected_mimic)) = mimic_user
+        .mimics
+        .iter()
+        .enumerate()
+        .find(|(_, m)| m.name.eq(&name))
+    else {
+        let embed =
+            utils::create_embed_builder("Mimic Set", "Could not find that mimic!", EmbedType::Bad);
+        ctx.send(Reply::default().embed(embed)).await?;
+        //FIXME: i need to implement correct errors for these things.
+        return Ok(());
+    };
+
+    if mimic_user.active_mimic.as_ref() == Some(selected_mimic) {
+        mimic_user.active_mimic = None;
+    }
+
+    let embed = utils::create_embed_builder(
+        "Mimic Deleted",
+        format!("You deleted {}!", selected_mimic.name),
+        EmbedType::Good,
+    );
+
+    // i don't like this... but ok
+    mimic_user.mimics.remove(index);
+
+    ctx.send(Reply::default().embed(embed)).await?;
+
+    Ok(())
 }
 
 /// /mimic set — sets your active mimic
@@ -100,9 +148,7 @@ pub async fn set(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: String
 
     let mimic_user = g.get_user(ctx.author().id);
 
-    let mimics = mimic_user.mimics.clone();
-
-    let Some(selected_mimic) = mimics.into_iter().filter(|m| m.name.eq(&name)).next_back() else {
+    let Some(selected_mimic) = mimic_user.mimics.iter().find(|m| m.name.eq(&name)) else {
         let embed =
             utils::create_embed_builder("Mimic Set", "Could not find that mimic!", EmbedType::Bad);
         ctx.send(Reply::default().embed(embed)).await?;
@@ -119,26 +165,6 @@ pub async fn set(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: String
 
     ctx.send(Reply::default().embed(embed)).await?;
     Ok(())
-}
-
-async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
-    let all_mimics = ctx
-        .data()
-        .mimic_db
-        .lock()
-        .await
-        .get_user(ctx.author().id)
-        .mimics
-        .clone();
-
-    let all_mimic_names = all_mimics.into_iter().map(|m| m.name);
-
-    let suggestions: Vec<AutocompleteChoice> = all_mimic_names
-        .filter(|i| i.starts_with(partial))
-        .map(|i| AutocompleteChoice::new(i.to_string(), i.to_string()))
-        .collect();
-
-    suggestions
 }
 
 /// /mimic say — speak as your active mimic in this channel
@@ -184,5 +210,5 @@ pub async fn say(
     ctx.send(Reply::default().ephemeral(true).content("sent~"))
         .await?;
 
-    ctx.Ok(())
+    Ok(())
 }

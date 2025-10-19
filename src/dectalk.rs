@@ -5,7 +5,7 @@ use std::{ffi::CString, path::Path, ptr};
 include!(concat!(env!("OUT_DIR"), "/dectalk_bindings.rs"));
 
 #[derive(Debug)]
-enum DectalkError {
+pub enum DectalkError {
     MmError {
         error_code: MMRESULT,
         loc: std::panic::Location<'static>,
@@ -37,7 +37,7 @@ fn check_mm(code: MMRESULT) -> Result<()> {
             error_code: (code),
             loc: (*loc),
         };
-        Err(Box::new(e))
+        Err(e.into())
     }
 }
 
@@ -65,7 +65,7 @@ impl Dectalk {
         let rc = unsafe { TextToSpeechStartup(&mut h as *mut LPTTS_HANDLE_T, 0, 0, None, 0) };
         check_mm(rc)?;
         if h.is_null() {
-            return Err(Box::new(DectalkError::NullHandleError));
+            return Err(DectalkError::NullHandleError.into());
         }
         Ok(Self { handle: h })
     }
