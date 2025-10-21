@@ -40,7 +40,7 @@ pub struct Mimic {
 pub struct MimicUser {
     pub active_mimic: Option<Mimic>,
     pub mimics: Vec<Mimic>,
-    pub auto_mode: bool,
+    pub auto_mode: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

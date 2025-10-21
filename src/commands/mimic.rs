@@ -4,7 +4,7 @@ use crate::{
     utils,
 };
 
-use poise::serenity_prelude::{self as serenity, AutocompleteChoice, ExecuteWebhook, GetMessages};
+use poise::serenity_prelude::{self as serenity, AutocompleteChoice, ExecuteWebhook};
 
 async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
     let all_mimics = ctx
@@ -25,7 +25,10 @@ async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice
     suggestions
 }
 
-#[poise::command(slash_command, subcommands("add", "list", "delete", "set", "say"))]
+#[poise::command(
+    slash_command,
+    subcommands("add", "list", "delete", "set", "say", "auto")
+)]
 pub async fn mimic(_ctx: Context<'_>) -> Result {
     Ok(())
 }
@@ -254,13 +257,14 @@ pub async fn auto(
     let mut g = mutex_db.lock().await;
     let mimic_user = g.get_user(ctx.author().id);
     match choice {
-        AutoChoice::Enable => mimic_user.auto_mode = true,
-        AutoChoice::Disable => mimic_user.auto_mode = false,
+        AutoChoice::Enable => mimic_user.auto_mode = Some(true),
+        AutoChoice::Disable => mimic_user.auto_mode = Some(false),
     }
 
+    //FIXME: mm.. unwrap is yucky.. but by this point mimic_users should be set.
     let embed = utils::create_embed_builder(
         "Mimic Auto",
-        format!("Auto Mode: {}", mimic_user.auto_mode),
+        format!("Auto Mode: {}", mimic_user.auto_mode.unwrap()),
         EmbedType::Good,
     );
 
