@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
-use crate::dectalk::DectalkError;
+use crate::{dectalk::DectalkError, types};
 
 pub enum PersistantData {
     MimicDB(MimicDB),
@@ -19,6 +19,9 @@ pub enum LogosErrors {
 
     #[error("tokio::JoinError: {0}")]
     TokioJoin(#[from] tokio::task::JoinError),
+
+    #[error("tokio::SendError {0}")]
+    TokioSend(#[from] tokio::sync::mpsc::error::SendError<types::PersistantData>),
 
     #[error("DectalkError: {0}")]
     Dectalk(#[from] DectalkError),
@@ -37,6 +40,7 @@ pub struct Mimic {
 pub struct MimicUser {
     pub active_mimic: Option<Mimic>,
     pub mimics: Vec<Mimic>,
+    pub auto_mode: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

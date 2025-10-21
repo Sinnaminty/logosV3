@@ -1,10 +1,10 @@
 use crate::{
     mimic_db::get_or_create_webhook,
-    types::{Context, Embed, EmbedType, Mimic, Reply, Result},
+    types::{Context, Embed, EmbedType, Mimic, PersistantData, Reply, Result},
     utils,
 };
 
-use poise::serenity_prelude::{self as serenity, AutocompleteChoice, ExecuteWebhook};
+use poise::serenity_prelude::{self as serenity, AutocompleteChoice, ExecuteWebhook, GetMessages};
 
 async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
     let all_mimics = ctx
@@ -67,10 +67,17 @@ pub async fn add(
 
     let embed = utils::create_embed_builder(
         "Mimic Add",
-        format!("Success! Your mimic {} has been added :3c", final_name),
+        format!("Success! Your mimic \"{}\" has been added :3c", final_name),
         EmbedType::Good,
     );
     ctx.send(Reply::default().embed(embed)).await?;
+
+    // try a save!
+    let db = g.clone();
+    ctx.data()
+        .persistant_data_channel
+        .send(PersistantData::MimicDB(db))
+        .await?;
     Ok(())
 }
 
@@ -127,7 +134,7 @@ pub async fn delete(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: Str
 
     let embed = utils::create_embed_builder(
         "Mimic Deleted",
-        format!("You deleted {}!", selected_mimic.name),
+        format!("You deleted \"{}\"!", selected_mimic.name),
         EmbedType::Good,
     );
 
@@ -135,6 +142,13 @@ pub async fn delete(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: Str
     mimic_user.mimics.remove(index);
 
     ctx.send(Reply::default().embed(embed)).await?;
+
+    // try a save!
+    let db = g.clone();
+    ctx.data()
+        .persistant_data_channel
+        .send(PersistantData::MimicDB(db))
+        .await?;
 
     Ok(())
 }
@@ -159,11 +173,18 @@ pub async fn set(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: String
     mimic_user.active_mimic = Some(selected_mimic.clone());
     let embed = utils::create_embed_builder(
         "Mimic Set",
-        format!("Your active mimic is set to {}", selected_mimic.name),
+        format!("Your active mimic is set to \"{}\"", selected_mimic.name),
         EmbedType::Good,
     );
 
     ctx.send(Reply::default().embed(embed)).await?;
+
+    // try a save!
+    let db = g.clone();
+    ctx.data()
+        .persistant_data_channel
+        .send(PersistantData::MimicDB(db))
+        .await?;
     Ok(())
 }
 
@@ -207,8 +228,48 @@ pub async fn say(
     }
 
     w.execute(ctx.http(), false, builder).await?;
-    ctx.send(Reply::default().ephemeral(true).content("sent~"))
+    let a = ctx
+        .send(Reply::default().ephemeral(true).content("sent~"))
         .await?;
 
+    //delete the message :3c
+    a.delete(ctx).await?;
+    Ok(())
+}
+
+#[derive(poise::ChoiceParameter)]
+pub enum AutoChoice {
+    #[name = "Enable"]
+    Enable,
+    #[name = "Disable"]
+    Disable,
+}
+
+#[poise::command(slash_command)]
+pub async fn auto(
+    ctx: Context<'_>,
+    #[description = "Enable/Disable Auto mode."] choice: AutoChoice,
+) -> Result {
+    let mutex_db = &ctx.data().mimic_db;
+    let mut g = mutex_db.lock().await;
+    let mimic_user = g.get_user(ctx.author().id);
+    match choice {
+        AutoChoice::Enable => mimic_user.auto_mode = true,
+        AutoChoice::Disable => mimic_user.auto_mode = false,
+    }
+
+    let embed = utils::create_embed_builder(
+        "Mimic Auto",
+        format!("Auto Mode: {}", mimic_user.auto_mode),
+        EmbedType::Good,
+    );
+
+    ctx.send(Reply::default().embed(embed)).await?;
+
+    let db = g.clone();
+    ctx.data()
+        .persistant_data_channel
+        .send(PersistantData::MimicDB(db))
+        .await?;
     Ok(())
 }

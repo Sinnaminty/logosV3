@@ -1,7 +1,6 @@
 use crate::commands;
 use crate::handlers;
-use crate::types::MimicDB;
-use crate::types::{Data, Error};
+use crate::types::{Data, Error, MimicDB, PersistantData};
 use poise::serenity_prelude as serenity;
 use tokio::sync::Mutex;
 
@@ -23,7 +22,7 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
     tokio::spawn(async move {
         while let Some(update) = recv.recv().await {
             match update {
-                crate::types::PersistantData::MimicDB(mimic_db) => _ = save_mimic_db(mimic_db),
+                PersistantData::MimicDB(mimic_db) => _ = save_mimic_db(mimic_db),
             };
         }
     });
