@@ -74,15 +74,15 @@ impl Dectalk {
         check_mm(unsafe { TextToSpeechSetRate(self.handle, wpm as DWORD) })
     }
 
-    /// DECtalk speakers are numeric IDs; consult caps/docs for mapping.
-    pub fn set_speaker(&self, speaker_id: u32) -> Result<()> {
-        check_mm(unsafe { TextToSpeechSetSpeaker(self.handle, speaker_id as SPEAKER_T) })
-    }
-
-    /// Set language by numeric code (e.g., TTS_AMERICAN_ENGLISH = 1)
-    pub fn set_language(&self, lang_code: u32) -> Result<()> {
-        check_mm(unsafe { TextToSpeechSetLanguage(self.handle, lang_code as LANGUAGE_T) })
-    }
+    //    /// DECtalk speakers are numeric IDs; consult caps/docs for mapping.
+    //    pub fn set_speaker(&self, speaker_id: u32) -> Result<()> {
+    //        check_mm(unsafe { TextToSpeechSetSpeaker(self.handle, speaker_id as SPEAKER_T) })
+    //    }
+    //
+    //    /// Set language by numeric code (e.g., TTS_AMERICAN_ENGLISH = 1)
+    //    pub fn set_language(&self, lang_code: u32) -> Result<()> {
+    //        check_mm(unsafe { TextToSpeechSetLanguage(self.handle, lang_code as LANGUAGE_T) })
+    //    }
 
     /// Write synthesized audio directly to a WAV file on disk.
     /// `format` is a DECtalk wave format code; 0 typically selects a default.
@@ -111,13 +111,13 @@ impl Dectalk {
         check_mm(unsafe { TextToSpeechCloseWaveOutFile(self.handle) })
     }
 
-    /// Pause/resume helpers
-    pub fn pause(&self) -> Result<()> {
-        check_mm(unsafe { TextToSpeechPause(self.handle) })
-    }
-    pub fn resume(&self) -> Result<()> {
-        check_mm(unsafe { TextToSpeechResume(self.handle) })
-    }
+    //    /// Pause/resume helpers
+    //    pub fn pause(&self) -> Result<()> {
+    //        check_mm(unsafe { TextToSpeechPause(self.handle) })
+    //    }
+    //    pub fn resume(&self) -> Result<()> {
+    //        check_mm(unsafe { TextToSpeechResume(self.handle) })
+    //    }
 }
 
 impl Drop for Dectalk {

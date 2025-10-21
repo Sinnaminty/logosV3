@@ -1,6 +1,8 @@
 use std::fmt::Display;
 
-use crate::types::{Embed, EmbedType};
+use poise::serenity_prelude::Webhook;
+
+use crate::types::{Embed, EmbedType, Error};
 use poise::serenity_prelude::{self as serenity};
 
 /// this is a trait!!
@@ -35,4 +37,24 @@ pub fn create_embed_builder(
         ))
         .author(serenity::builder::CreateEmbedAuthor::new("Logos"))
         .color(embed_type.into_color())
+}
+
+pub async fn get_or_create_webhook(
+    http: &serenity::Http,
+    channel_id: serenity::ChannelId,
+) -> Result<Webhook, Error> {
+    const WEBHOOK_NAME: &str = "logosV3-mimic";
+    if let Ok(existing) = channel_id.webhooks(http).await
+        && let Some(w) = existing
+            .into_iter()
+            .find(|w| w.name.as_deref() == Some(WEBHOOK_NAME))
+    {
+        return Ok(w);
+    }
+
+    //the webby don't exist :c
+    let hook = channel_id
+        .create_webhook(http, serenity::CreateWebhook::new(WEBHOOK_NAME))
+        .await?;
+    Ok(hook)
 }

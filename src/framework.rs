@@ -35,6 +35,7 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
                 prefix: Some(String::from("!")),
                 ..Default::default()
             },
+            event_handler: handlers::event_handler,
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {

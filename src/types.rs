@@ -1,4 +1,4 @@
-use poise::serenity_prelude::{self as serenity, GatewayIntents, UserId};
+use poise::serenity_prelude::{self as serenity, ChannelId, GatewayIntents, GuildId, UserId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
@@ -41,6 +41,8 @@ pub struct MimicUser {
     pub active_mimic: Option<Mimic>,
     pub mimics: Vec<Mimic>,
     pub auto_mode: Option<bool>,
+    #[serde(default)]
+    pub channel_override: HashMap<ChannelId, Mimic>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
