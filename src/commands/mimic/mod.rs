@@ -27,26 +27,6 @@ async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice
 
     suggestions
 }
-async fn fetch_channel_overrides(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
-    let mut g = ctx.data().mimic_db.lock().await;
-    let all_guild_channels = &ctx.guild().unwrap().channels;
-
-    let override_channels = g
-        .get_user(ctx.author().id)
-        .channel_override
-        .keys()
-        .filter_map(|c_id| all_guild_channels.get(c_id))
-        .cloned()
-        .collect::<Vec<_>>();
-
-    let suggestions: Vec<AutocompleteChoice> = override_channels
-        .iter()
-        .filter(|i| i.name.starts_with(partial))
-        .map(|i| AutocompleteChoice::new(i.name.clone(), i.id.get()))
-        .collect();
-
-    suggestions
-}
 
 #[poise::command(slash_command, subcommands("add", "list", "delete", "set", "say"))]
 pub async fn mimic(_ctx: Context<'_>) -> Result {
@@ -158,11 +138,10 @@ pub async fn say(
     };
 
     //right.... time to implement logic for channel override.
-    selected_mimic = mimic_user
-        .channel_override
-        .get(&ctx.channel_id())
-        .cloned()
-        .unwrap_or(selected_mimic);
+    selected_mimic = match mimic_user.channel_override.get(&ctx.channel_id()) {
+        Some(m) => m.clone(),
+        None => selected_mimic,
+    };
 
     let w = utils::get_or_create_webhook(ctx.http(), ctx.channel_id())
         .await

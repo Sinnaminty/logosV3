@@ -1,7 +1,6 @@
-use poise::serenity_prelude::{Channel, ChannelId, GuildChannel};
+use poise::serenity_prelude::{Channel, ChannelId};
 
 use crate::{
-    commands::mimic::fetch_channel_overrides,
     commands::mimic::fetch_mimics,
     types::{Context, EmbedType, PersistantData, Reply, Result},
     utils,
@@ -55,22 +54,19 @@ pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: Stri
 
     Ok(())
 }
-
 //FIXME: there should be a way to grab the autocomplete command data straight from
 //channel_override.
 
 /// /mimic delete channel_override — delete a channel_override if set.
 #[poise::command(slash_command)]
-pub async fn channel_override(
-    ctx: Context<'_>,
-    #[autocomplete = "fetch_channel_overrides"] channel: u64,
-) -> Result {
+pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
     let db = &ctx.data().mimic_db;
     let mut g = db.lock().await;
     let mimic_user = g.get_user(ctx.author().id);
+
     let Some(_) = mimic_user
         .channel_override
-        .remove(&ChannelId::from(channel))
+        .remove(&ChannelId::from(channel.clone()))
     else {
         let embed = utils::create_embed_builder(
             "Mimic delete channel_override",

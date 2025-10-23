@@ -53,9 +53,19 @@ pub fn event_handler<'a>(
                     return Ok(());
                 };
 
-                let Some(active_mimic) = mimic_user.active_mimic else {
+                if mimic_user.active_mimic.is_none() {
                     log::warn!("Auto mode on but no active_mimic... strange..");
                     return Ok(());
+                }
+
+                let selected_mimic = match mimic_user
+                    .channel_override
+                    .get(new_message.channel_id.as_ref())
+                {
+                    Some(m) => m.clone(),
+                    None => mimic_user
+                        .active_mimic
+                        .expect("this user should have an active_mimic set."),
                 };
 
                 if auto_mode {
@@ -67,9 +77,9 @@ pub fn event_handler<'a>(
 
                     let mut builder = ExecuteWebhook::new()
                         .content(content)
-                        .username(active_mimic.name);
+                        .username(selected_mimic.name);
 
-                    if let Some(s) = active_mimic.avatar_url {
+                    if let Some(s) = selected_mimic.avatar_url {
                         builder = builder.avatar_url(s);
                     }
                     new_message.delete(&ctx.http).await?;
