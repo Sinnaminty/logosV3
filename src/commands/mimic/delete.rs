@@ -6,12 +6,13 @@ use crate::{
     utils,
 };
 
+/// /mimic delete: commands meant for deleting things :3c
 #[poise::command(slash_command, subcommands("mimic", "channel_override"))]
 pub async fn delete(_ctx: Context<'_>) -> Result {
     Ok(())
 }
 
-/// /mimic delete mimic — delete a mimic
+/// /mimic delete mimic: delete one of your mimics (noooo,,,,)
 #[poise::command(slash_command)]
 pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: String) -> Result {
     let db = &ctx.data().mimic_db;
@@ -54,10 +55,8 @@ pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: Stri
 
     Ok(())
 }
-//FIXME: there should be a way to grab the autocomplete command data straight from
-//channel_override.
 
-/// /mimic delete channel_override — delete a channel_override if set.
+/// /mimic delete channel_override: delete a channel_override if set.
 #[poise::command(slash_command)]
 pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
     let db = &ctx.data().mimic_db;

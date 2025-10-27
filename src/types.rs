@@ -1,10 +1,11 @@
-use poise::serenity_prelude::{self as serenity, ChannelId, GatewayIntents, GuildId, UserId};
+use poise::serenity_prelude::{self as serenity, ChannelId, GatewayIntents, UserId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
 use crate::{dectalk::DectalkError, types};
 
+#[derive(Debug)]
 pub enum PersistantData {
     MimicDB(MimicDB),
 }

@@ -8,6 +8,7 @@ use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::ExecuteWebhook;
 use std::pin::Pin;
 
+// TODO: rewrite error handling system in it's entirety.
 pub fn error_handler(
     error: FrameworkError<'_, Data, Error>,
 ) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
@@ -71,6 +72,8 @@ pub fn event_handler<'a>(
                 if auto_mode {
                     let content = new_message.content.clone();
 
+                    // FIXME: bro.. an unwrap..? are you ill? do you need tummy rubs~?
+                    // seriously. fix this :c
                     let w = utils::get_or_create_webhook(&ctx.http, new_message.channel_id)
                         .await
                         .unwrap();

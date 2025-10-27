@@ -17,7 +17,7 @@ mod utils;
 #[command(version, about, long_about = None)]
 pub struct Args {
     /// Log level (error, warn, info, debug, trace)
-    #[arg(short, long, default_value_t = LevelFilter::Warn)]
+    #[arg(short, long, default_value_t = LevelFilter::Info)]
     pub log_level: LevelFilter,
 }
 
