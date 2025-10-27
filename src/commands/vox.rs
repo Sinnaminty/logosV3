@@ -4,12 +4,14 @@ use crate::{
 };
 use poise::serenity_prelude as serenity;
 
+/// Vox: A suite of commands around Dectalk voice synthesis.
 #[poise::command(slash_command, subcommands("say"), subcommand_required)]
 pub async fn vox(_: Context<'_>) -> Result<(), Error> {
     //lmao, again
     panic!();
 }
 
+/// Vox Say:
 #[poise::command(slash_command)]
 pub async fn say(
     ctx: Context<'_>,
@@ -24,7 +26,6 @@ pub async fn say(
 
         // Create and use DECtalk entirely on this blocking thread.
         let tts = Dectalk::new()?;
-
         if let Some(r) = rate {
             let _ = tts.set_rate(r);
         }
