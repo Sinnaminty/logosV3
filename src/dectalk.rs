@@ -1,43 +1,55 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 use crate::pawthos::types::Result;
-use std::{ffi::CString, path::Path, ptr};
+use std::{
+    ffi::{CString, NulError},
+    path::Path,
+    ptr,
+};
 // Generated in build.rs as OUT_DIR/dectalk_bindings.rs
 include!(concat!(env!("OUT_DIR"), "/dectalk_bindings.rs"));
 
 #[derive(Debug)]
 pub enum DectalkError {
-    MmError {
+    Mm {
         error_code: MMRESULT,
         loc: std::panic::Location<'static>,
     },
-    NullHandleError,
+    NullHandle,
+    FfiNul(std::ffi::NulError),
 }
 
 impl std::fmt::Display for DectalkError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DectalkError::MmError { error_code, loc } => {
+            DectalkError::Mm { error_code, loc } => {
                 write!(f, "DectalkMmError {} at {}", error_code, loc)
             }
-            DectalkError::NullHandleError => write!(f, "DectalkNullHandleError"),
+            DectalkError::NullHandle => write!(f, "DectalkNullHandleError"),
+            DectalkError::FfiNul(e) => write!(f, "Nul byte found in string: {}", e),
         }
+    }
+}
+
+impl From<NulError> for DectalkError {
+    fn from(e: NulError) -> Self {
+        DectalkError::FfiNul(e)
     }
 }
 
 impl std::error::Error for DectalkError {}
 
 #[track_caller]
-fn check_mm(code: MMRESULT) -> Result<()> {
+fn check_mm(code: MMRESULT) -> Result<(), DectalkError> {
     if code == 0 {
         Ok(())
     } else {
         let loc = std::panic::Location::caller();
 
-        let e = DectalkError::MmError {
+        let e = DectalkError::Mm {
             error_code: (code),
             loc: (*loc),
         };
-        Err(e.into())
+        Err(e)
     }
 }
 
@@ -59,19 +71,20 @@ impl Dectalk {
     /// Start DECtalk. Uses no window/callback and default device options.
     /// For headless use (WAV/memory output), we keep device options at 0 and
     /// direct output to a wave file using `TextToSpeechOpenWaveOutFile`.
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Result<Self, DectalkError> {
         log::debug!("Dectalk::new()");
         let mut h: LPTTS_HANDLE_T = ptr::null_mut();
         let rc = unsafe { TextToSpeechStartup(&mut h as *mut LPTTS_HANDLE_T, 0, 0, None, 0) };
         check_mm(rc)?;
         if h.is_null() {
-            return Err(DectalkError::NullHandleError.into());
+            return Err(DectalkError::NullHandle);
         }
         Ok(Self { handle: h })
     }
 
-    pub fn set_rate(&self, wpm: u32) -> Result<()> {
-        check_mm(unsafe { TextToSpeechSetRate(self.handle, wpm as DWORD) })
+    pub fn set_rate(&self, wpm: u32) -> Result<(), DectalkError> {
+        check_mm(unsafe { TextToSpeechSetRate(self.handle, wpm as DWORD) })?;
+        Ok(())
     }
 
     //    /// DECtalk speakers are numeric IDs; consult caps/docs for mapping.
@@ -91,7 +104,7 @@ impl Dectalk {
         text: &str,
         out_path: impl AsRef<Path>,
         format: WaveFormat,
-    ) -> Result<()> {
+    ) -> Result<(), DectalkError> {
         // Open the wave file output
         let cpath = CString::new(out_path.as_ref().to_string_lossy().as_bytes())?;
         check_mm(unsafe {
@@ -108,7 +121,8 @@ impl Dectalk {
         check_mm(unsafe { TextToSpeechSync(self.handle) })?;
 
         // Close the wave file
-        check_mm(unsafe { TextToSpeechCloseWaveOutFile(self.handle) })
+        check_mm(unsafe { TextToSpeechCloseWaveOutFile(self.handle) })?;
+        Ok(())
     }
 
     //    /// Pause/resume helpers

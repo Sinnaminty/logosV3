@@ -5,9 +5,6 @@ pub enum LogosErrors {
     #[error("SerenityError: {0}")]
     Serenity(#[from] poise::serenity_prelude::Error),
 
-    #[error("ffiError: {0}")]
-    FfiNul(#[from] std::ffi::NulError),
-
     #[error("tokio::JoinError: {0}")]
     TokioJoin(#[from] tokio::task::JoinError),
 
