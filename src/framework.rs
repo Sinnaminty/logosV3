@@ -2,13 +2,13 @@ use crate::commands;
 use crate::handlers;
 use crate::pawthos::enums::persistant_data::PersistantData;
 use crate::pawthos::structs::{data::Data, mimic_db::MimicDB};
-use crate::pawthos::types::Error;
+use crate::pawthos::types::{Error, Result};
 use poise::serenity_prelude as serenity;
 use tokio::sync::Mutex;
 
 const BUFFER_SIZE: usize = 1;
 
-fn save_mimic_db(db: MimicDB) -> Result<(), Error> {
+fn save_mimic_db(db: MimicDB) -> Result {
     let db_json = poise::serenity_prelude::json::to_string(&db)?;
     std::fs::write("data.json", db_json)?;
     log::debug!("mimic_db saved :3c");

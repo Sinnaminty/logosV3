@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use crate::pawthos::structs::mimic::Mimic;
 use poise::serenity_prelude::ChannelId;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MimicUser {

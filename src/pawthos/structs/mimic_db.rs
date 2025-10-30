@@ -1,8 +1,6 @@
 use crate::pawthos::structs::mimic_user::MimicUser;
-use serde::{Deserialize, Serialize};
-
 use poise::serenity_prelude::UserId;
-
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
