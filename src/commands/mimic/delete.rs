@@ -1,10 +1,9 @@
-use poise::serenity_prelude::{Channel, ChannelId};
-
-use crate::{
-    commands::mimic::fetch_mimics,
-    types::{Context, EmbedType, PersistantData, Reply, Result},
-    utils,
+use crate::pawthos::{
+    enums::{embed_type::EmbedType, persistant_data::PersistantData},
+    types::{Context, Reply, Result},
 };
+use crate::{commands::mimic::fetch_mimics, utils};
+use poise::serenity_prelude::{Channel, ChannelId};
 
 /// /mimic delete: commands meant for deleting things :3c
 #[poise::command(slash_command, subcommands("mimic", "channel_override"))]

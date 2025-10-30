@@ -1,8 +1,7 @@
-use poise::serenity_prelude as serenity;
-
 pub use crate::framework::setup_framework;
 pub use crate::logging::setup_logging;
-pub use crate::types::INTENTS;
+pub use crate::pawthos::consts::INTENTS;
+use poise::serenity_prelude as serenity;
 
 use crate::utils::ResultExt;
 

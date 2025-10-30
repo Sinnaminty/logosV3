@@ -1,9 +1,10 @@
-use crate::{
-    commands::mimic::fetch_mimics,
-    types::{Context, EmbedType, PersistantData, Reply, Result},
-    utils,
+use crate::pawthos::{
+    enums::{embed_type::EmbedType, persistant_data::PersistantData},
+    types::{Context, Reply, Result},
 };
+use crate::{commands::mimic::fetch_mimics, utils};
 use poise::serenity_prelude::Channel;
+
 #[poise::command(slash_command, subcommands("active_mimic", "channel_override", "auto"))]
 pub async fn set(_ctx: Context<'_>) -> Result {
     Ok(())

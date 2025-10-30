@@ -1,6 +1,8 @@
 use crate::commands;
 use crate::handlers;
-use crate::types::{Data, Error, MimicDB, PersistantData};
+use crate::pawthos::enums::persistant_data::PersistantData;
+use crate::pawthos::structs::{data::Data, mimic_db::MimicDB};
+use crate::pawthos::types::Error;
 use poise::serenity_prelude as serenity;
 use tokio::sync::Mutex;
 

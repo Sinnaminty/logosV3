@@ -7,9 +7,8 @@ mod dectalk;
 mod framework;
 mod handlers;
 mod logging;
-mod mimic_db;
+mod pawthos;
 mod setup;
-mod types;
 mod utils;
 
 /// V3 of the same bot. I need a job...

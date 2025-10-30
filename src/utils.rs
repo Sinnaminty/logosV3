@@ -1,9 +1,9 @@
+use crate::pawthos::enums::embed_type::EmbedType;
+use crate::pawthos::types::Embed;
+use crate::pawthos::types::Error;
+use poise::serenity_prelude as serenity;
+use serenity::Webhook;
 use std::fmt::Display;
-
-use poise::serenity_prelude::Webhook;
-
-use crate::types::{Embed, EmbedType, Error};
-use poise::serenity_prelude::{self as serenity};
 
 /// this is a trait!!
 pub trait ResultExt<T, E> {
@@ -43,7 +43,7 @@ pub async fn get_or_create_webhook(
     http: &serenity::Http,
     channel_id: serenity::ChannelId,
 ) -> Result<Webhook, Error> {
-    const WEBHOOK_NAME: &str = "logosV3-mimic";
+    const WEBHOOK_NAME: &str = "pawthos-mimic";
     if let Ok(existing) = channel_id.webhooks(http).await
         && let Some(w) = existing
             .into_iter()

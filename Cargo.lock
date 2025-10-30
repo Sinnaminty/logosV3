@@ -1108,7 +1108,6 @@ dependencies = [
  "clap",
  "hound",
  "log",
- "once_cell",
  "parking_lot 0.12.5",
  "poise",
  "serde",

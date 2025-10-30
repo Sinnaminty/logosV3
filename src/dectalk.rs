@@ -1,5 +1,5 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
-use crate::types::Result;
+use crate::pawthos::types::Result;
 use std::{ffi::CString, path::Path, ptr};
 // Generated in build.rs as OUT_DIR/dectalk_bindings.rs
 include!(concat!(env!("OUT_DIR"), "/dectalk_bindings.rs"));

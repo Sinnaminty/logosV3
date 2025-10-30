@@ -1,7 +1,7 @@
-use crate::types::Data;
-use crate::types::EmbedType;
-use crate::types::Error;
-use crate::types::Reply;
+use crate::pawthos::enums::embed_type::EmbedType;
+use crate::pawthos::structs::data::Data;
+use crate::pawthos::types::Error;
+use crate::pawthos::types::Reply;
 use crate::utils;
 use poise::FrameworkError;
 use poise::serenity_prelude as serenity;

@@ -1,13 +1,14 @@
-use crate::{
-    commands::mimic::delete::*,
-    commands::mimic::set::*,
-    types::{Context, Embed, EmbedType, Mimic, PersistantData, Reply, Result},
-    utils,
+use crate::commands::mimic::{delete::*, set::*};
+use crate::pawthos::{
+    enums::{embed_type::EmbedType, persistant_data::PersistantData},
+    structs::mimic::Mimic,
+    types::{Context, Embed, Reply, Result},
 };
-
+use crate::utils;
+use poise::serenity_prelude as serenity;
+use serenity::{AutocompleteChoice, ExecuteWebhook};
 mod delete;
 mod set;
-use poise::serenity_prelude::{self as serenity, AutocompleteChoice, ExecuteWebhook};
 
 async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
     let all_mimics = ctx

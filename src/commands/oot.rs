@@ -1,11 +1,12 @@
-use crate::{
-    types::{Context, EmbedType, Error, Reply},
-    utils,
+use crate::pawthos::{
+    enums::embed_type::EmbedType,
+    types::{Context, Reply, Result},
 };
+use crate::utils;
 use poise::serenity_prelude as serenity;
 
 #[poise::command(slash_command, subcommands("add"))]
-pub async fn oot(_: Context<'_>) -> Result<(), Error> {
+pub async fn oot(_: Context<'_>) -> Result {
     //lmao
     panic!();
 }
@@ -15,7 +16,7 @@ pub async fn oot(_: Context<'_>) -> Result<(), Error> {
 pub async fn add(
     ctx: Context<'_>,
     #[description = "Select your json."] file: serenity::Attachment,
-) -> Result<(), Error> {
+) -> Result {
     let is_json = file
         .content_type
         .as_ref()
@@ -39,6 +40,6 @@ pub async fn add(
 }
 
 #[poise::command(slash_command)]
-pub async fn hint(_ctx: Context<'_>) -> Result<(), Error> {
+pub async fn hint(_ctx: Context<'_>) -> Result {
     todo!();
 }
