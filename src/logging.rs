@@ -6,6 +6,7 @@ pub fn setup_logging(l: LevelFilter) {
         .with_level(l)
         .with_module_level("tracing::span", LevelFilter::Warn)
         .with_module_level("serenity::http", LevelFilter::Warn)
+        .with_module_level("serenity::gateway", LevelFilter::Warn)
         .init()
         .expect("Failed to set up logging. Panic!");
 }

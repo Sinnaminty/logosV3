@@ -1,15 +1,16 @@
-use crate::{
-    commands::oot::*,
-    commands::vox::*,
-    types::{Context, Data, EmbedType, Error, Reply},
-    utils,
+use crate::pawthos::{
+    enums::embed_type::EmbedType,
+    structs::data::Data,
+    types::{Context, Error, Reply, Result},
 };
+use crate::{commands::mimic::*, commands::oot::*, commands::vox::*, utils};
+use poise::serenity_prelude as serenity;
+mod mimic;
 mod oot;
 mod vox;
-use poise::serenity_prelude as serenity;
 
 pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
-    vec![oot(), pfp(), register(), vox()]
+    vec![oot(), pfp(), register(), vox(), mimic()]
 }
 
 // NOTE: add the ability to grab both global pfp and guild.
@@ -18,7 +19,7 @@ pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
 pub async fn pfp(
     ctx: Context<'_>,
     #[description = "User to show pfp of"] user: serenity::User,
-) -> Result<(), Error> {
+) -> Result {
     let ce =
         utils::create_embed_builder("pfp", format!("{}'s pfp", &user.name), EmbedType::Neutral)
             .image(user.avatar_url().unwrap_or_else(|| {
@@ -32,7 +33,7 @@ pub async fn pfp(
 }
 
 #[poise::command(prefix_command)]
-pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn register(ctx: Context<'_>) -> Result {
     poise::builtins::register_application_commands_buttons(ctx).await?;
     log::warn!("Debug register command called!!!");
     Ok(())

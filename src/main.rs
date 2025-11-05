@@ -7,8 +7,8 @@ mod dectalk;
 mod framework;
 mod handlers;
 mod logging;
+mod pawthos;
 mod setup;
-mod types;
 mod utils;
 
 /// V3 of the same bot. I need a job...
@@ -16,7 +16,7 @@ mod utils;
 #[command(version, about, long_about = None)]
 pub struct Args {
     /// Log level (error, warn, info, debug, trace)
-    #[arg(short, long, default_value_t = LevelFilter::Warn)]
+    #[arg(short, long, default_value_t = LevelFilter::Info)]
     pub log_level: LevelFilter,
 }
 

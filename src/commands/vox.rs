@@ -1,22 +1,22 @@
-use crate::{
-    dectalk::{Dectalk, WaveFormat},
-    types::{Context, Error},
-};
+use crate::dectalk::{Dectalk, WaveFormat};
+use crate::pawthos::types::{Context, Result};
 use poise::serenity_prelude as serenity;
 
+/// Vox: A suite of commands around Dectalk voice synthesis.
 #[poise::command(slash_command, subcommands("say"), subcommand_required)]
-pub async fn vox(_: Context<'_>) -> Result<(), Error> {
+pub async fn vox(_: Context<'_>) -> Result {
     //lmao, again
     panic!();
 }
 
+/// Vox Say:
 #[poise::command(slash_command)]
 pub async fn say(
     ctx: Context<'_>,
     #[description = "Text to synthesize"] text: String,
     #[description = "Words per minute"] rate: Option<u32>,
-) -> Result<(), Error> {
-    let path = tokio::task::spawn_blocking(move || -> Result<std::path::PathBuf, Error> {
+) -> Result {
+    let path = tokio::task::spawn_blocking(move || -> Result<std::path::PathBuf> {
         use std::{
             env,
             time::{SystemTime, UNIX_EPOCH},
@@ -24,7 +24,6 @@ pub async fn say(
 
         // Create and use DECtalk entirely on this blocking thread.
         let tts = Dectalk::new()?;
-
         if let Some(r) = rate {
             let _ = tts.set_rate(r);
         }
