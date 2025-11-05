@@ -1,9 +1,9 @@
 use crate::pawthos::{
-    enums::{embed_type::EmbedType, persistant_data::PersistantData},
+    enums::embed_type::EmbedType,
     types::{Context, Reply, Result},
 };
 use crate::{commands::mimic::fetch_mimics, utils};
-use poise::serenity_prelude::{Channel, ChannelId};
+use poise::serenity_prelude::Channel;
 
 /// /mimic delete: commands meant for deleting things :3c
 #[poise::command(slash_command, subcommands("mimic", "channel_override"))]
@@ -14,85 +14,67 @@ pub async fn delete(_ctx: Context<'_>) -> Result {
 /// /mimic delete mimic: delete one of your mimics (noooo,,,,)
 #[poise::command(slash_command)]
 pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: String) -> Result {
-    let db = &ctx.data().mimic_db;
-    let mut g = db.lock().await;
-    let mimic_user = g.get_user(ctx.author().id);
+    let user_id = ctx.author().id;
+    let target = name.trim();
 
-    let Some((index, selected_mimic)) = mimic_user
-        .mimics
-        .iter()
-        .enumerate()
-        .find(|(_, m)| m.name.eq(&name))
-    else {
-        let embed = utils::create_embed_builder(
-            "Mimic Delete",
+    let deleted: Option<String> = ctx
+        .data()
+        .with_user_write(user_id, |user| {
+            if let Some(idx) = user.mimics.iter().position(|m| m.name == target) {
+                let removed = user.mimics.remove(idx);
+                Some(removed.name)
+            } else {
+                None
+            }
+        })
+        .await;
+
+    let embed = match deleted {
+        Some(deleted_name) => utils::create_embed_builder(
+            "Mimic Delete Mimic",
+            format!("You deleted \"{}\"!", deleted_name),
+            EmbedType::Good,
+        ),
+        None => utils::create_embed_builder(
+            "Mimic Delete Mimic",
             "Could not find that mimic!",
             EmbedType::Bad,
-        );
-        ctx.send(Reply::default().embed(embed)).await?;
-        //FIXME: i need to implement correct errors for these things.
-        return Ok(());
+        ),
     };
 
-    let embed = utils::create_embed_builder(
-        "Mimic Deleted",
-        format!("You deleted \"{}\"!", selected_mimic.name),
-        EmbedType::Good,
-    );
-
-    // i don't like this... but ok
-    mimic_user.mimics.remove(index);
-
     ctx.send(Reply::default().embed(embed)).await?;
-
-    // try a save!
-    let db = g.clone();
-    ctx.data()
-        .persistant_data_channel
-        .send(PersistantData::MimicDB(db))
-        .await?;
-
     Ok(())
 }
 
 /// /mimic delete channel_override: delete a channel_override if set.
 #[poise::command(slash_command)]
 pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
-    let db = &ctx.data().mimic_db;
-    let mut g = db.lock().await;
-    let mimic_user = g.get_user(ctx.author().id);
+    let user_id = ctx.author().id;
+    let channel_id = channel.id();
 
-    let Some(_) = mimic_user
-        .channel_override
-        .remove(&ChannelId::from(channel.clone()))
-    else {
-        let embed = utils::create_embed_builder(
-            "Mimic delete channel_override",
+    let removed: bool = ctx
+        .data()
+        .with_user_write(user_id, |user| {
+            user.channel_override.remove(&channel_id).is_some()
+        })
+        .await;
+
+    let embed = match removed {
+        true => utils::create_embed_builder(
+            "Mimic Delete channel_override",
+            format!(
+                "Successfully deleted channel override for channel {}",
+                channel
+            ),
+            EmbedType::Good,
+        ),
+        false => utils::create_embed_builder(
+            "Mimic Delete channel_override",
             "Could not find that channel_override!",
             EmbedType::Bad,
-        );
-        ctx.send(Reply::default().embed(embed)).await?;
-        //FIXME: i need to implement correct errors for these things.
-        return Ok(());
+        ),
     };
 
-    let embed = utils::create_embed_builder(
-        "Mimic delete channel_override",
-        format!(
-            "Successfully deleted channel override for channel {}",
-            channel
-        ),
-        EmbedType::Good,
-    );
-
     ctx.send(Reply::default().embed(embed)).await?;
-
-    // try a save!
-    let db = g.clone();
-    ctx.data()
-        .persistant_data_channel
-        .send(PersistantData::MimicDB(db))
-        .await?;
-
     Ok(())
 }

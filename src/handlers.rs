@@ -5,7 +5,7 @@ use crate::pawthos::types::Reply;
 use crate::utils;
 use poise::FrameworkError;
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::ExecuteWebhook;
+use serenity::{ExecuteWebhook, FullEvent};
 use std::pin::Pin;
 
 // TODO: rewrite error handling system in it's entirety.
@@ -40,54 +40,52 @@ pub fn event_handler<'a>(
 > {
     Box::pin(async move {
         match event {
-            serenity::FullEvent::Message { new_message } => {
+            FullEvent::Message { new_message } => {
                 // check if this user has auto mode enabled.
 
-                let mimic_user = data
-                    .mimic_db
-                    .lock()
-                    .await
-                    .get_user(new_message.author.id)
-                    .clone();
+                let user_id = new_message.author.id;
+                let channel_id = new_message.channel_id;
+                let maybe_mimic = data
+                    .with_user_read(user_id, |maybe_user| {
+                        let u = maybe_user?;
+                        let auto = u.auto_mode.unwrap_or(false);
+                        if !auto {
+                            return None;
+                        }
+                        u.channel_override
+                            .get(&channel_id)
+                            .cloned()
+                            .or_else(|| u.active_mimic.clone())
+                    })
+                    .await;
 
-                let Some(auto_mode) = mimic_user.auto_mode else {
+                let Some(selected_mimic) = maybe_mimic else {
                     return Ok(());
                 };
 
-                if mimic_user.active_mimic.is_none() {
-                    log::warn!("Auto mode on but no active_mimic... strange..");
-                    return Ok(());
+                let content = new_message.content.clone();
+
+                let webhook = match utils::get_or_create_webhook(&ctx.http, channel_id).await {
+                    Ok(w) => w,
+                    Err(e) => {
+                        log::warn!("get_or_create_webhook failed: {e}");
+                        return Ok(());
+                    }
+                };
+
+                let mut builder = ExecuteWebhook::new()
+                    .content(content)
+                    .username(selected_mimic.name);
+
+                if let Some(s) = selected_mimic.avatar_url {
+                    builder = builder.avatar_url(s);
+                }
+                if let Err(e) = new_message.delete(&ctx.http).await {
+                    log::warn!("Failed to delete original message: {e}");
                 }
 
-                let selected_mimic = match mimic_user
-                    .channel_override
-                    .get(new_message.channel_id.as_ref())
-                {
-                    Some(m) => m.clone(),
-                    None => mimic_user
-                        .active_mimic
-                        .expect("this user should have an active_mimic set."),
-                };
-
-                if auto_mode {
-                    let content = new_message.content.clone();
-
-                    // FIXME: bro.. an unwrap..? are you ill? do you need tummy rubs~?
-                    // seriously. fix this :c
-                    let w = utils::get_or_create_webhook(&ctx.http, new_message.channel_id)
-                        .await
-                        .unwrap();
-
-                    let mut builder = ExecuteWebhook::new()
-                        .content(content)
-                        .username(selected_mimic.name);
-
-                    if let Some(s) = selected_mimic.avatar_url {
-                        builder = builder.avatar_url(s);
-                    }
-                    new_message.delete(&ctx.http).await?;
-
-                    w.execute(&ctx.http, false, builder).await?;
+                if let Err(e) = webhook.execute(&ctx.http, false, builder).await {
+                    log::warn!("Webhook execute failed: {e}");
                 }
                 Ok(())
             }

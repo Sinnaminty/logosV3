@@ -4,7 +4,7 @@ use crate::pawthos::enums::persistant_data::PersistantData;
 use crate::pawthos::structs::{data::Data, mimic_db::MimicDB};
 use crate::pawthos::types::{Error, Result};
 use poise::serenity_prelude as serenity;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 const BUFFER_SIZE: usize = 1;
 
@@ -34,7 +34,11 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
         while let Some(update) = recv.recv().await {
             log::debug!("update received! type: {:?}", update);
             match update {
-                PersistantData::MimicDB(mimic_db) => _ = save_mimic_db(mimic_db),
+                PersistantData::MimicDB(mimic_db_snapshot) => {
+                    if let Err(e) = save_mimic_db(mimic_db_snapshot) {
+                        log::error!("Failed to save MimicDB: {:?}", e);
+                    }
+                }
             };
         }
     });
@@ -54,7 +58,7 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(Data {
-                    mimic_db: Mutex::new(db),
+                    mimic_db: RwLock::new(db),
                     persistant_data_channel: send,
                 })
             })

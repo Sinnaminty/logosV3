@@ -1,54 +1,54 @@
 use crate::pawthos::{
-    enums::{embed_type::EmbedType, persistant_data::PersistantData},
+    enums::embed_type::EmbedType,
     types::{Context, Reply, Result},
 };
 use crate::{commands::mimic::fetch_mimics, utils};
 use poise::serenity_prelude::Channel;
 
+/// /mimic set: Options to enable/disable/set for the mimic suite of commands.
 #[poise::command(slash_command, subcommands("active_mimic", "channel_override", "auto"))]
 pub async fn set(_ctx: Context<'_>) -> Result {
     Ok(())
 }
 
-/// /mimic set active_mimic — sets your active mimic
+/// /mimic set active_mimic: Sets your active mimic
 #[poise::command(slash_command)]
 pub async fn active_mimic(
     ctx: Context<'_>,
     #[autocomplete = "fetch_mimics"] name: String,
 ) -> Result {
-    let mutex_db = &ctx.data().mimic_db;
-    let mut g = mutex_db.lock().await;
-    let mimic_user = g.get_user(ctx.author().id);
+    let user_id = ctx.author().id;
+    let target = name.trim();
 
-    let Some(selected_mimic) = mimic_user.mimics.iter().find(|m| m.name.eq(&name)) else {
-        let embed = utils::create_embed_builder(
+    let selected: Option<String> = ctx
+        .data()
+        .with_user_write(user_id, |user| {
+            if let Some(m) = user.mimics.iter().find(|m| m.name == target) {
+                user.active_mimic = Some(m.clone());
+                Some(m.name.clone())
+            } else {
+                None
+            }
+        })
+        .await;
+
+    let embed = match selected {
+        Some(mimic_name) => utils::create_embed_builder(
+            "Mimic Set active_mimic",
+            format!("Your active mimic is set to \"{}\"", mimic_name),
+            EmbedType::Good,
+        ),
+        None => utils::create_embed_builder(
             "Mimic Set active_mimic",
             "Could not find that mimic!",
             EmbedType::Bad,
-        );
-        ctx.send(Reply::default().embed(embed)).await?;
-        //FIXME: i need to implement correct errors for these things.
-        return Ok(());
+        ),
     };
 
-    mimic_user.active_mimic = Some(selected_mimic.clone());
-    let embed = utils::create_embed_builder(
-        "Mimic Set",
-        format!("Your active mimic is set to \"{}\"", selected_mimic.name),
-        EmbedType::Good,
-    );
-
     ctx.send(Reply::default().embed(embed)).await?;
-
-    // try a save!
-    let db = g.clone();
-    ctx.data()
-        .persistant_data_channel
-        .send(PersistantData::MimicDB(db))
-        .await?;
     Ok(())
 }
-/// /mimic set channel_override - overrides a channel to always display a specific mimic
+/// /mimic set channel_override: overrides a channel to always display a specific mimic
 #[poise::command(slash_command)]
 pub async fn channel_override(
     ctx: Context<'_>,
@@ -57,36 +57,35 @@ pub async fn channel_override(
     #[autocomplete = "fetch_mimics"]
     name: String,
 ) -> Result {
-    let mutex_db = &ctx.data().mimic_db;
+    let user_id = ctx.author().id;
+    let channel_id = channel.id();
+    let target = name.trim();
 
-    let mut g = mutex_db.lock().await;
+    let chosen: Option<String> = ctx
+        .data()
+        .with_user_write(user_id, |user| {
+            if let Some(m) = user.mimics.iter().find(|m| m.name == target) {
+                user.channel_override.insert(channel_id, m.clone());
+                Some(m.name.clone())
+            } else {
+                None
+            }
+        })
+        .await;
 
-    let mimic_user = g.get_user(ctx.author().id);
-
-    let Some(selected_mimic) = mimic_user.mimics.iter().find(|m| m.name.eq(&name)) else {
-        let embed = utils::create_embed_builder(
+    let embed = match chosen {
+        Some(mimic_name) => utils::create_embed_builder(
+            "Mimic Set channel_override",
+            format!("\"{}\" is set to channel \"{}\"", mimic_name, channel),
+            EmbedType::Good,
+        ),
+        None => utils::create_embed_builder(
             "Mimic Set channel_override",
             "Could not find that mimic!",
             EmbedType::Bad,
-        );
-
-        ctx.send(Reply::default().embed(embed)).await?;
-        //FIXME: i need to implement correct errors for these things.
-        return Ok(());
+        ),
     };
 
-    mimic_user
-        .channel_override
-        .insert(channel.id(), selected_mimic.clone());
-
-    let embed = utils::create_embed_builder(
-        "Mimic Set channel_override",
-        format!(
-            "\"{}\" is set to channel \"{}\"",
-            selected_mimic.name, channel
-        ),
-        EmbedType::Good,
-    );
     ctx.send(Reply::default().embed(embed)).await?;
     Ok(())
 }
@@ -99,36 +98,43 @@ pub enum AutoChoice {
     Disable,
 }
 
+/// /mimic set auto: Automatically talk in any channel as your active mimic.
 #[poise::command(slash_command)]
 pub async fn auto(
     ctx: Context<'_>,
     #[description = "Enable/Disable Auto mode."] choice: AutoChoice,
 ) -> Result {
-    let mutex_db = &ctx.data().mimic_db;
-    let mut g = mutex_db.lock().await;
-    let mimic_user = g.get_user(ctx.author().id);
+    let user_id = ctx.author().id;
+    let enable = matches!(choice, AutoChoice::Enable);
 
-    // check if this user has an active_mimic.
-    if mimic_user.active_mimic.is_none() {
-        let embed =
-            utils::create_embed_builder("Mimic Auto", "No active mimic set!", EmbedType::Bad);
-        ctx.send(Reply::default().embed(embed)).await?;
-        return Ok(());
+    enum Outcome {
+        NoActive,
+        Set(bool),
     }
 
-    let auto_mode = mimic_user.auto_mode.insert(choice == AutoChoice::Enable);
-    let embed = utils::create_embed_builder(
-        "Mimic Auto",
-        format!("Auto Mode: {}", auto_mode),
-        EmbedType::Good,
-    );
+    let outcome = ctx
+        .data()
+        .with_user_write(user_id, |user| {
+            if user.active_mimic.is_none() {
+                return Outcome::NoActive;
+            }
+            user.auto_mode = Some(enable);
+            Outcome::Set(enable)
+        })
+        .await;
+
+    let embed = match outcome {
+        Outcome::NoActive => {
+            utils::create_embed_builder("Mimic Auto", "No active mimic set!", EmbedType::Bad)
+        }
+        Outcome::Set(state) => utils::create_embed_builder(
+            "Mimic Auto",
+            format!("Auto Mode: {}", state),
+            EmbedType::Good,
+        ),
+    };
+
     ctx.send(Reply::default().embed(embed)).await?;
 
-    let db = g.clone();
-
-    ctx.data()
-        .persistant_data_channel
-        .send(PersistantData::MimicDB(db))
-        .await?;
     Ok(())
 }

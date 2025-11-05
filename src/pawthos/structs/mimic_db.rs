@@ -9,9 +9,13 @@ pub struct MimicDB {
 }
 
 impl MimicDB {
-    /// returns the MimicUser stored inside of the Db. will create a new MimicUser entry if the
-    /// userID is not found inside of the Db.
-    pub fn get_user(&mut self, user: UserId) -> &mut MimicUser {
+    /// Get an immutable reference to a user if they exist.
+    pub fn get_user(&self, user: UserId) -> Option<&MimicUser> {
+        self.db.get(&user)
+    }
+
+    /// Get a mutable reference to a use, creating one if missing.
+    pub fn get_user_mut(&mut self, user: UserId) -> &mut MimicUser {
         self.db.entry(user).or_default()
     }
 }
