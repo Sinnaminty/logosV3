@@ -1,9 +1,9 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 use crate::pawthos::types::Result;
 use std::{
-    ffi::{CString, NulError},
+    ffi::{CString, NulError, c_void},
     path::Path,
-    ptr,
+    ptr::{self, NonNull},
 };
 // Generated in build.rs as OUT_DIR/dectalk_bindings.rs
 include!(concat!(env!("OUT_DIR"), "/dectalk_bindings.rs"));
@@ -55,7 +55,7 @@ fn check_mm(code: MMRESULT) -> Result<(), DectalkError> {
 
 #[derive(Debug)]
 pub struct Dectalk {
-    handle: LPTTS_HANDLE_T,
+    handle: NonNull<c_void>,
 }
 
 pub enum WaveFormat {
@@ -73,28 +73,30 @@ impl Dectalk {
     /// direct output to a wave file using `TextToSpeechOpenWaveOutFile`.
     pub fn new() -> Result<Self, DectalkError> {
         log::debug!("Dectalk::new()");
-        let mut h: LPTTS_HANDLE_T = ptr::null_mut();
-        let rc = unsafe { TextToSpeechStartup(&mut h as *mut LPTTS_HANDLE_T, 0, 0, None, 0) };
+        let mut raw: LPTTS_HANDLE_T = ptr::null_mut();
+        // SAFETY: TextToSpeechStartup is safe because we know that LPTTS_HANDLE_T is a proper null_mut pointer
+        // before the function call, and we check if the handle is null afterwards.
+        // for more information on the TextToSpeechStarup, visit https://dectalk.github.io/dectalk/dectalk.htm
+        let rc = unsafe { TextToSpeechStartup(&mut raw, 0, 0, None, 0) };
         check_mm(rc)?;
-        if h.is_null() {
-            return Err(DectalkError::NullHandle);
-        }
-        Ok(Self { handle: h })
+
+        let handle = NonNull::new(raw).ok_or(DectalkError::NullHandle)?;
+        Ok(Self { handle })
     }
 
     pub fn set_rate(&self, wpm: u32) -> Result<(), DectalkError> {
-        check_mm(unsafe { TextToSpeechSetRate(self.handle, wpm as DWORD) })?;
+        check_mm(unsafe { TextToSpeechSetRate(self.handle.as_ptr(), wpm as DWORD) })?;
         Ok(())
     }
 
     //    /// DECtalk speakers are numeric IDs; consult caps/docs for mapping.
     //    pub fn set_speaker(&self, speaker_id: u32) -> Result<()> {
-    //        check_mm(unsafe { TextToSpeechSetSpeaker(self.handle, speaker_id as SPEAKER_T) })
+    //        check_mm(unsafe { TextToSpeechSetSpeaker(self.handle.as_ptr(), speaker_id as SPEAKER_T) })
     //    }
     //
     //    /// Set language by numeric code (e.g., TTS_AMERICAN_ENGLISH = 1)
     //    pub fn set_language(&self, lang_code: u32) -> Result<()> {
-    //        check_mm(unsafe { TextToSpeechSetLanguage(self.handle, lang_code as LANGUAGE_T) })
+    //        check_mm(unsafe { TextToSpeechSetLanguage(self.handle.as_ptr(), lang_code as LANGUAGE_T) })
     //    }
 
     /// Write synthesized audio directly to a WAV file on disk.
@@ -108,38 +110,42 @@ impl Dectalk {
         // Open the wave file output
         let cpath = CString::new(out_path.as_ref().to_string_lossy().as_bytes())?;
         check_mm(unsafe {
-            TextToSpeechOpenWaveOutFile(self.handle, cpath.as_ptr() as *mut i8, format as DWORD)
+            TextToSpeechOpenWaveOutFile(
+                self.handle.as_ptr(),
+                cpath.as_ptr() as *mut i8,
+                format as DWORD,
+            )
         })?;
 
         // Speak the text in normal mode (ASCII expected by this entry point)
         let mut bytes = text.as_bytes().to_vec();
         bytes.retain(|&b| b != 0); // strip interior NULs
         let ctext = CString::new(bytes)?;
-        check_mm(unsafe { TextToSpeechSpeak(self.handle, ctext.as_ptr() as *mut i8, TTS_NORMAL) })?;
+        check_mm(unsafe {
+            TextToSpeechSpeak(self.handle.as_ptr(), ctext.as_ptr() as *mut i8, TTS_NORMAL)
+        })?;
 
         // Wait until all queued speech is done
-        check_mm(unsafe { TextToSpeechSync(self.handle) })?;
+        check_mm(unsafe { TextToSpeechSync(self.handle.as_ptr()) })?;
 
         // Close the wave file
-        check_mm(unsafe { TextToSpeechCloseWaveOutFile(self.handle) })?;
+        check_mm(unsafe { TextToSpeechCloseWaveOutFile(self.handle.as_ptr()) })?;
         Ok(())
     }
 
     //    /// Pause/resume helpers
     //    pub fn pause(&self) -> Result<()> {
-    //        check_mm(unsafe { TextToSpeechPause(self.handle) })
+    //        check_mm(unsafe { TextToSpeechPause(self.handle.as_ptr()) })
     //    }
     //    pub fn resume(&self) -> Result<()> {
-    //        check_mm(unsafe { TextToSpeechResume(self.handle) })
+    //        check_mm(unsafe { TextToSpeechResume(self.handle.as_ptr()) })
     //    }
 }
 
 impl Drop for Dectalk {
     fn drop(&mut self) {
-        if !self.handle.is_null() {
-            unsafe {
-                let _ = TextToSpeechShutdown(self.handle);
-            }
+        unsafe {
+            let _ = TextToSpeechShutdown(self.handle.as_ptr());
         }
     }
 }

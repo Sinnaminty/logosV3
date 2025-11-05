@@ -45,21 +45,19 @@ pub fn event_handler<'a>(
 
                 let user_id = new_message.author.id;
                 let channel_id = new_message.channel_id;
-                let maybe_mimic = data
+                let selected_mimic = data
                     .with_user_read(user_id, |maybe_user| {
-                        let u = maybe_user?;
-                        let auto = u.auto_mode.unwrap_or(false);
+                        let user = maybe_user?;
+                        let auto = user.auto_mode.unwrap_or(false);
                         if !auto {
                             return None;
                         }
-                        u.channel_override
-                            .get(&channel_id)
-                            .cloned()
-                            .or_else(|| u.active_mimic.clone())
+                        user.get_active_mimic(channel_id)
                     })
                     .await;
 
-                let Some(selected_mimic) = maybe_mimic else {
+                let Some(selected_mimic) = selected_mimic else {
+                    log::warn!("auto mode enabled yet no active mimic!!");
                     return Ok(());
                 };
 

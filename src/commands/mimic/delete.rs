@@ -59,20 +59,21 @@ pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
         })
         .await;
 
-    let embed = match removed {
-        true => utils::create_embed_builder(
+    let embed = if removed {
+        utils::create_embed_builder(
             "Mimic Delete channel_override",
             format!(
                 "Successfully deleted channel override for channel {}",
                 channel
             ),
             EmbedType::Good,
-        ),
-        false => utils::create_embed_builder(
+        )
+    } else {
+        utils::create_embed_builder(
             "Mimic Delete channel_override",
             "Could not find that channel_override!",
             EmbedType::Bad,
-        ),
+        )
     };
 
     ctx.send(Reply::default().embed(embed)).await?;

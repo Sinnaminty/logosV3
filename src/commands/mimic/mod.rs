@@ -18,8 +18,11 @@ async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice
                 .map(|user| {
                     user.mimics
                         .iter()
-                        .filter(|m| m.name.starts_with(partial))
-                        .map(|m| AutocompleteChoice::new(m.name.clone(), m.name.clone()))
+                        .filter_map(|m| {
+                            m.name
+                                .starts_with(partial)
+                                .then_some(AutocompleteChoice::new(m.name.clone(), m.name.clone()))
+                        })
                         .collect()
                 })
                 .unwrap_or_default()
@@ -76,15 +79,12 @@ pub async fn list(ctx: Context<'_>) -> Result {
     let reply = ctx
         .data()
         .with_user_read(user_id, |maybe_user| {
-            let user = match maybe_user {
-                Some(u) => u,
-                None => {
-                    return Reply::default().embed(utils::create_embed_builder(
-                        "Mimic List",
-                        "You don't have any mimics!",
-                        EmbedType::Bad,
-                    ));
-                }
+            let Some(user) = maybe_user else {
+                return Reply::default().embed(utils::create_embed_builder(
+                    "Mimic List",
+                    "You don't have any mimics!",
+                    EmbedType::Bad,
+                ));
             };
 
             user.mimics
@@ -115,12 +115,7 @@ pub async fn say(
     let selected_mimic = ctx
         .data()
         .with_user_read(user_id, |maybe_user| {
-            maybe_user.and_then(|user| {
-                user.channel_override
-                    .get(&channel_id)
-                    .cloned()
-                    .or_else(|| user.active_mimic.clone())
-            })
+            maybe_user.and_then(|user| user.get_active_mimic(channel_id))
         })
         .await;
 
@@ -130,6 +125,7 @@ pub async fn say(
             "You have no active Mimic set!",
             EmbedType::Bad,
         );
+
         ctx.send(Reply::default().embed(embed).ephemeral(true))
             .await?;
         return Ok(());

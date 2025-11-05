@@ -17,4 +17,11 @@ impl MimicUser {
     pub fn add_mimic(&mut self, mimic: Mimic) {
         self.mimics.push(mimic);
     }
+    /// gets this user's active_mimic, returning the correct channel_override if it exists.
+    pub fn get_active_mimic(&self, channel_id: ChannelId) -> Option<Mimic> {
+        self.channel_override
+            .get(&channel_id)
+            .cloned()
+            .or_else(|| self.active_mimic.clone())
+    }
 }

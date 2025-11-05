@@ -20,7 +20,7 @@ pub async fn active_mimic(
     let user_id = ctx.author().id;
     let target = name.trim();
 
-    let selected: Option<String> = ctx
+    let selected = ctx
         .data()
         .with_user_write(user_id, |user| {
             if let Some(m) = user.mimics.iter().find(|m| m.name == target) {
