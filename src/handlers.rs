@@ -57,7 +57,9 @@ pub fn event_handler<'a>(
                     .await;
 
                 let Some(selected_mimic) = selected_mimic else {
-                    log::warn!("auto mode enabled yet no active mimic!!");
+                    //BUG: this log is incorrect because having a "None" doesn't necessarliy mean
+                    //that auto mode is enabled.
+                    //log::warn!("auto mode enabled yet no active mimic!!");
                     return Ok(());
                 };
 
