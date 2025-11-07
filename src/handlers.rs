@@ -41,25 +41,21 @@ pub fn event_handler<'a>(
     Box::pin(async move {
         match event {
             FullEvent::Message { new_message } => {
-                // check if this user has auto mode enabled.
-
                 let user_id = new_message.author.id;
                 let channel_id = new_message.channel_id;
-                let selected_mimic = data
+                let Ok(Some(selected_mimic)) = data
                     .with_user_read(user_id, |maybe_user| {
-                        let user = maybe_user?;
+                        let Some(user) = maybe_user else {
+                            return Err(());
+                        };
                         let auto = user.auto_mode.unwrap_or(false);
                         if !auto {
-                            return None;
+                            return Err(());
                         }
-                        user.get_active_mimic(channel_id)
+                        Ok(user.get_active_mimic(channel_id))
                     })
-                    .await;
-
-                let Some(selected_mimic) = selected_mimic else {
-                    //BUG: this log is incorrect because having a "None" doesn't necessarliy mean
-                    //that auto mode is enabled.
-                    //log::warn!("auto mode enabled yet no active mimic!!");
+                    .await
+                else {
                     return Ok(());
                 };
 
