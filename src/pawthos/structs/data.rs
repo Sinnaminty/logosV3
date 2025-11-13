@@ -1,3 +1,4 @@
+use crate::commands::mimic::MimicError;
 use crate::pawthos::enums::persistant_data::PersistantData;
 use crate::pawthos::structs::mimic_db::MimicDB;
 use crate::pawthos::structs::mimic_user::MimicUser;
@@ -60,13 +61,16 @@ impl Data {
     /// # summary
     /// # }
     /// ```
-    pub async fn with_user_read<R, F>(&self, user_id: UserId, f: F) -> R
+    pub async fn with_user_read<R, F>(&self, user_id: UserId, f: F) -> Result<R, MimicError>
     where
-        F: for<'a> FnOnce(Option<&'a MimicUser>) -> R,
+        F: for<'a> FnOnce(&'a MimicUser) -> R,
     {
         let db_guard = self.mimic_db.read().await;
         let maybe_user = db_guard.get_user(user_id);
-        f(maybe_user)
+        match maybe_user {
+            Some(user) => Ok(f(user)),
+            None => Err(MimicError::NoUserFound),
+        }
     }
 
     /// Mutable access to a user's [`MimicUser`] with **automatic persistence** of changes.

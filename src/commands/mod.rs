@@ -5,7 +5,7 @@ use crate::pawthos::{
 };
 use crate::{commands::mimic::*, commands::oot::*, commands::vox::*, utils};
 use poise::serenity_prelude as serenity;
-mod mimic;
+pub(crate) mod mimic;
 mod oot;
 mod vox;
 
