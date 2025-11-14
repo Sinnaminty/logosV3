@@ -1,4 +1,6 @@
+use crate::commands::mimic::MimicError;
 use crate::pawthos::enums::embed_type::EmbedType;
+use crate::pawthos::enums::pawthos_errors::PawthosErrors;
 use crate::pawthos::structs::data::Data;
 use crate::pawthos::types::Error;
 use crate::pawthos::types::Reply;
@@ -8,7 +10,6 @@ use poise::serenity_prelude as serenity;
 use serenity::{ExecuteWebhook, FullEvent};
 use std::pin::Pin;
 
-// TODO: rewrite error handling system in it's entirety.
 pub fn error_handler(
     error: FrameworkError<'_, Data, Error>,
 ) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
@@ -23,8 +24,45 @@ pub fn error_handler(
 
                 let _ = ctx.send(Reply::default().embed(embed)).await;
             }
+            poise::FrameworkError::EventHandler {
+                error,
+                ctx,
+                event,
+                framework,
+                ..
+            } => match event {
+                FullEvent::Message { new_message } => match error {
+                    PawthosErrors::Mimic(MimicError::NoActiveMimic) => {
+                        let user_id = new_message.author.id;
+                        // no error to be found here..
+                        let _ = framework
+                            .user_data
+                            .with_user_write(user_id, |user| {
+                                user.auto_mode = false;
+                                Ok(())
+                            })
+                            .await;
+
+                        if let Err(e) = new_message
+                            .reply(
+                                &ctx.http,
+                                "You have no active mimic! unsetting auto_mode...",
+                            )
+                            .await
+                        {
+                            log::error!("super error.. {e}");
+                        };
+                    }
+                    _ => log::error!("{error}"),
+                },
+                //some other FullEvent
+                _ => {
+                    log::error!("Framework Event error: {error}",);
+                }
+            },
+            //some other FrameworkError
             other => {
-                log::error!("Framework error: {other:#?}",);
+                log::error!("Framework error: {other:#?}");
             }
         }
     })
@@ -41,35 +79,36 @@ pub fn event_handler<'a>(
     Box::pin(async move {
         match event {
             FullEvent::Message { new_message } => {
-                // check if this user has auto mode enabled.
-
                 let user_id = new_message.author.id;
                 let channel_id = new_message.channel_id;
-                let selected_mimic = data
-                    .with_user_read(user_id, |maybe_user| {
-                        let user = maybe_user?;
-                        let auto = user.auto_mode.unwrap_or(false);
-                        if !auto {
-                            return None;
-                        }
-                        user.get_active_mimic(channel_id)
-                    })
-                    .await;
 
-                let Some(selected_mimic) = selected_mimic else {
-                    log::warn!("auto mode enabled yet no active mimic!!");
-                    return Ok(());
+                // with_user_read only throws NoMimicUserFound error. if no mimic user is found in
+                // the message callback, it isn't a big deal
+                let selected_mimic = match data
+                    .with_user_read(user_id, |user| {
+                        if !user.auto_mode {
+                            return Err(MimicError::AutoModeFalse);
+                        }
+                        Ok(user.get_active_mimic(channel_id))
+                    })
+                    .await
+                    .flatten()
+                {
+                    Ok(m) => m,
+                    Err(e @ (MimicError::NoUserFound | MimicError::AutoModeFalse)) => {
+                        log::debug!("{e}");
+                        return Ok(());
+                    }
+                    Err(e @ MimicError::NoActiveMimic) => {
+                        log::warn!("Auto mode is true yet this user has no active mimic!");
+                        return Err(e.into());
+                    }
+                    Err(e) => return Err(e.into()),
                 };
 
                 let content = new_message.content.clone();
 
-                let webhook = match utils::get_or_create_webhook(&ctx.http, channel_id).await {
-                    Ok(w) => w,
-                    Err(e) => {
-                        log::warn!("get_or_create_webhook failed: {e}");
-                        return Ok(());
-                    }
-                };
+                let webhook = utils::get_or_create_webhook(&ctx.http, channel_id).await?;
 
                 let mut builder = ExecuteWebhook::new()
                     .content(content)
@@ -78,13 +117,16 @@ pub fn event_handler<'a>(
                 if let Some(s) = selected_mimic.avatar_url {
                     builder = builder.avatar_url(s);
                 }
+                //we also want to raise the following errors to the user.
                 if let Err(e) = new_message.delete(&ctx.http).await {
                     log::warn!("Failed to delete original message: {e}");
+                    return Err(e.into());
                 }
 
                 if let Err(e) = webhook.execute(&ctx.http, false, builder).await {
                     log::warn!("Webhook execute failed: {e}");
-                }
+                    return Err(e.into());
+                };
                 Ok(())
             }
             _ => {

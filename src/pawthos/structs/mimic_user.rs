@@ -1,4 +1,4 @@
-use crate::pawthos::structs::mimic::Mimic;
+use crate::{commands::mimic::MimicError, pawthos::structs::mimic::Mimic};
 use poise::serenity_prelude::ChannelId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -7,8 +7,8 @@ use std::collections::HashMap;
 pub struct MimicUser {
     pub active_mimic: Option<Mimic>,
     pub mimics: Vec<Mimic>,
-    pub auto_mode: Option<bool>,
     #[serde(default)]
+    pub auto_mode: bool,
     pub channel_override: HashMap<ChannelId, Mimic>,
 }
 
@@ -18,10 +18,11 @@ impl MimicUser {
         self.mimics.push(mimic);
     }
     /// gets this user's active_mimic, returning the correct channel_override if it exists.
-    pub fn get_active_mimic(&self, channel_id: ChannelId) -> Option<Mimic> {
+    pub fn get_active_mimic(&self, channel_id: ChannelId) -> Result<Mimic, MimicError> {
         self.channel_override
             .get(&channel_id)
             .cloned()
             .or_else(|| self.active_mimic.clone())
+            .ok_or(MimicError::NoActiveMimic)
     }
 }

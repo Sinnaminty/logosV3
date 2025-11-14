@@ -1,8 +1,8 @@
-use crate::pawthos::enums::logos_errors::LogosErrors;
+use crate::pawthos::enums::pawthos_errors::PawthosErrors;
 use crate::pawthos::structs::data::Data;
 use poise::serenity_prelude as serenity;
 
-pub type Error = LogosErrors;
+pub type Error = PawthosErrors;
 
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 

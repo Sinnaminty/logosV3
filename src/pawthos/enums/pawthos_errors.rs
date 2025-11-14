@@ -1,7 +1,8 @@
+use crate::commands::mimic::MimicError;
 use crate::dectalk::DectalkError;
 
 #[derive(thiserror::Error, Debug)]
-pub enum LogosErrors {
+pub enum PawthosErrors {
     #[error("SerenityError: {0}")]
     Serenity(#[from] poise::serenity_prelude::Error),
 
@@ -21,4 +22,7 @@ pub enum LogosErrors {
 
     #[error("std::io: {0}")]
     StdIo(#[from] std::io::Error),
+
+    #[error("MimicError: {0}")]
+    Mimic(#[from] MimicError),
 }

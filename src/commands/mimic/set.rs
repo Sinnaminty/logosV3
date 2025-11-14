@@ -1,6 +1,9 @@
-use crate::pawthos::{
-    enums::embed_type::EmbedType,
-    types::{Context, Reply, Result},
+use crate::{
+    commands::mimic::MimicError,
+    pawthos::{
+        enums::embed_type::EmbedType,
+        types::{Context, Reply, Result},
+    },
 };
 use crate::{commands::mimic::fetch_mimics, utils};
 use poise::serenity_prelude::Channel;
@@ -20,30 +23,25 @@ pub async fn active_mimic(
     let user_id = ctx.author().id;
     let target = name.trim();
 
-    let selected = ctx
+    let mimic_name = ctx
         .data()
         .with_user_write(user_id, |user| {
-            if let Some(m) = user.mimics.iter().find(|m| m.name == target) {
-                user.active_mimic = Some(m.clone());
-                Some(m.name.clone())
-            } else {
-                None
-            }
-        })
-        .await;
+            let m = user
+                .mimics
+                .iter()
+                .find(|m| m.name == target)
+                .ok_or(MimicError::MimicNotFound)?;
+            user.active_mimic = Some(m.clone());
 
-    let embed = match selected {
-        Some(mimic_name) => utils::create_embed_builder(
-            "Mimic Set active_mimic",
-            format!("Your active mimic is set to \"{}\"", mimic_name),
-            EmbedType::Good,
-        ),
-        None => utils::create_embed_builder(
-            "Mimic Set active_mimic",
-            "Could not find that mimic!",
-            EmbedType::Bad,
-        ),
-    };
+            Ok(m.name.clone())
+        })
+        .await?;
+
+    let embed = utils::create_embed_builder(
+        "Mimic Set active_mimic",
+        format!("Your active mimic is set to \"{}\"", mimic_name),
+        EmbedType::Good,
+    );
 
     ctx.send(Reply::default().embed(embed)).await?;
     Ok(())
@@ -61,30 +59,25 @@ pub async fn channel_override(
     let channel_id = channel.id();
     let target = name.trim();
 
-    let chosen: Option<String> = ctx
+    let mimic_name = ctx
         .data()
         .with_user_write(user_id, |user| {
-            if let Some(m) = user.mimics.iter().find(|m| m.name == target) {
-                user.channel_override.insert(channel_id, m.clone());
-                Some(m.name.clone())
-            } else {
-                None
-            }
-        })
-        .await;
+            let m = user
+                .mimics
+                .iter()
+                .find(|m| m.name == target)
+                .ok_or(MimicError::MimicNotFound)?;
 
-    let embed = match chosen {
-        Some(mimic_name) => utils::create_embed_builder(
-            "Mimic Set channel_override",
-            format!("\"{}\" is set to channel \"{}\"", mimic_name, channel),
-            EmbedType::Good,
-        ),
-        None => utils::create_embed_builder(
-            "Mimic Set channel_override",
-            "Could not find that mimic!",
-            EmbedType::Bad,
-        ),
-    };
+            user.channel_override.insert(channel_id, m.clone());
+            Ok(m.name.clone())
+        })
+        .await?;
+
+    let embed = utils::create_embed_builder(
+        "Mimic Set channel_override",
+        format!("\"{}\" is set to channel \"{}\"", mimic_name, channel),
+        EmbedType::Good,
+    );
 
     ctx.send(Reply::default().embed(embed)).await?;
     Ok(())
@@ -107,32 +100,22 @@ pub async fn auto(
     let user_id = ctx.author().id;
     let enable = matches!(choice, AutoChoice::Enable);
 
-    enum Outcome {
-        NoActive,
-        Set(bool),
-    }
-
     let outcome = ctx
         .data()
         .with_user_write(user_id, |user| {
             if user.active_mimic.is_none() {
-                return Outcome::NoActive;
+                return Err(MimicError::NoActiveMimic);
             }
-            user.auto_mode = Some(enable);
-            Outcome::Set(enable)
+            user.auto_mode = enable;
+            Ok(enable)
         })
-        .await;
+        .await?;
 
-    let embed = match outcome {
-        Outcome::NoActive => {
-            utils::create_embed_builder("Mimic Auto", "No active mimic set!", EmbedType::Bad)
-        }
-        Outcome::Set(state) => utils::create_embed_builder(
-            "Mimic Auto",
-            format!("Auto Mode: {}", state),
-            EmbedType::Good,
-        ),
-    };
+    let embed = utils::create_embed_builder(
+        "Mimic Auto",
+        format!("Auto Mode: {}", outcome),
+        EmbedType::Good,
+    );
 
     ctx.send(Reply::default().embed(embed)).await?;
 

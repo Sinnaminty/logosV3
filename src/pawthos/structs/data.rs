@@ -1,3 +1,4 @@
+use crate::commands::mimic::MimicError;
 use crate::pawthos::enums::persistant_data::PersistantData;
 use crate::pawthos::structs::mimic_db::MimicDB;
 use crate::pawthos::structs::mimic_user::MimicUser;
@@ -60,13 +61,13 @@ impl Data {
     /// # summary
     /// # }
     /// ```
-    pub async fn with_user_read<R, F>(&self, user_id: UserId, f: F) -> R
+    pub async fn with_user_read<R, F>(&self, user_id: UserId, f: F) -> Result<R, MimicError>
     where
-        F: for<'a> FnOnce(Option<&'a MimicUser>) -> R,
+        F: for<'a> FnOnce(&'a MimicUser) -> Result<R, MimicError>,
     {
         let db_guard = self.mimic_db.read().await;
         let maybe_user = db_guard.get_user(user_id);
-        f(maybe_user)
+        f(maybe_user.ok_or(MimicError::NoUserFound)?)
     }
 
     /// Mutable access to a user's [`MimicUser`] with **automatic persistence** of changes.
@@ -130,14 +131,14 @@ impl Data {
     /// chosen
     /// # }
     /// ```
-    pub async fn with_user_write<R, F>(&self, user_id: UserId, f: F) -> R
+    pub async fn with_user_write<T, F>(&self, user_id: UserId, f: F) -> Result<T, MimicError>
     where
-        F: for<'a> FnOnce(&'a mut MimicUser) -> R,
+        F: for<'a> FnOnce(&'a mut MimicUser) -> Result<T, MimicError>,
     {
         let mut db_guard = self.mimic_db.write().await;
         // Mutate in-memory under write lock
         let user_entry = db_guard.get_user_mut(user_id);
-        let result = f(user_entry);
+        let result = f(user_entry)?;
         // Capture a consistent snapshot while still holding the lock
         let snapshot = db_guard.clone();
 
@@ -151,6 +152,6 @@ impl Data {
         {
             log::warn!("Failed to queue MimicDB save: {:?}", e);
         }
-        result
+        Ok(result)
     }
 }

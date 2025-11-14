@@ -10,24 +10,54 @@ use serenity::{AutocompleteChoice, ExecuteWebhook};
 mod delete;
 mod set;
 
+// TODO: Define errors here.
+#[derive(Debug)]
+pub enum MimicError {
+    NoUserFound,
+    NoActiveMimic,
+    AutoModeFalse,
+    NoChannelOverride,
+    MimicNotFound,
+    DeleteActiveMimicWithAutoModeEnabled,
+}
+
+impl std::fmt::Display for MimicError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MimicError::NoUserFound => write!(f, "No Mimic User found in Mimic User Database!"),
+            MimicError::NoActiveMimic => write!(f, "User has no active Mimic Set!"),
+            MimicError::AutoModeFalse => write!(f, "Auto mode is false!"),
+            MimicError::NoChannelOverride => {
+                write!(f, "There is not a channel override set for this channel!")
+            }
+            MimicError::MimicNotFound => {
+                write!(f, "That Mimic doesn't exist!")
+            }
+            MimicError::DeleteActiveMimicWithAutoModeEnabled => {
+                write!(f, "Cannot delete active Mimic with auto_mode enabled!")
+            }
+        }
+    }
+}
+
+impl std::error::Error for MimicError {}
+
 /// Returns AutocompleteChoices to the Mimic slash commands that request Mimic Autocompletes.
 async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
     ctx.data()
-        .with_user_read(ctx.author().id, |maybe_user| {
-            maybe_user
-                .map(|user| {
-                    user.mimics
-                        .iter()
-                        .filter_map(|m| {
-                            m.name
-                                .starts_with(partial)
-                                .then_some(AutocompleteChoice::new(m.name.clone(), m.name.clone()))
-                        })
-                        .collect()
+        .with_user_read(ctx.author().id, |user| {
+            Ok(user
+                .mimics
+                .iter()
+                .filter_map(|m| {
+                    m.name
+                        .starts_with(partial)
+                        .then_some(AutocompleteChoice::new(m.name.clone(), m.name.clone()))
                 })
-                .unwrap_or_default()
+                .collect())
         })
         .await
+        .unwrap_or_default()
 }
 
 /// /mimic: Mimic suite of commands.
@@ -37,6 +67,7 @@ pub async fn mimic(_ctx: Context<'_>) -> Result {
 }
 
 /// /mimic add: Create a mimic from an avatar + a name.
+// non-fallible func
 #[poise::command(slash_command)]
 pub async fn add(
     ctx: Context<'_>,
@@ -51,7 +82,9 @@ pub async fn add(
     let att_url = attachment.as_ref().map(|a| a.url.clone());
     let avatar_url = att_url.or(avatar_url);
 
-    ctx.data()
+    // no error here...
+    let _ = ctx
+        .data()
         .with_user_write(user_id, |user| {
             let m = Mimic {
                 name: name.clone(),
@@ -59,6 +92,7 @@ pub async fn add(
             };
             user.add_mimic(m.clone());
             user.active_mimic = Some(m);
+            Ok(())
         })
         .await;
 
@@ -78,16 +112,9 @@ pub async fn list(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
     let reply = ctx
         .data()
-        .with_user_read(user_id, |maybe_user| {
-            let Some(user) = maybe_user else {
-                return Reply::default().embed(utils::create_embed_builder(
-                    "Mimic List",
-                    "You don't have any mimics!",
-                    EmbedType::Bad,
-                ));
-            };
-
-            user.mimics
+        .with_user_read(user_id, |user| {
+            Ok(user
+                .mimics
                 .iter()
                 .map(|m| {
                     let mut embed = Embed::new().title(m.name.clone());
@@ -96,9 +123,9 @@ pub async fn list(ctx: Context<'_>) -> Result {
                     }
                     embed
                 })
-                .fold(Reply::default(), |r, e| r.embed(e))
+                .fold(Reply::default(), |r, e| r.embed(e)))
         })
-        .await;
+        .await?;
 
     ctx.send(reply).await?;
     Ok(())
@@ -114,22 +141,8 @@ pub async fn say(
     let channel_id = ctx.channel_id();
     let selected_mimic = ctx
         .data()
-        .with_user_read(user_id, |maybe_user| {
-            maybe_user.and_then(|user| user.get_active_mimic(channel_id))
-        })
-        .await;
-
-    let Some(selected_mimic) = selected_mimic else {
-        let embed = utils::create_embed_builder(
-            "Mimic Say",
-            "You have no active Mimic set!",
-            EmbedType::Bad,
-        );
-
-        ctx.send(Reply::default().embed(embed).ephemeral(true))
-            .await?;
-        return Ok(());
-    };
+        .with_user_read(user_id, |user| Ok(user.get_active_mimic(channel_id)))
+        .await??;
 
     let webhook = utils::get_or_create_webhook(ctx.http(), channel_id).await?;
 
