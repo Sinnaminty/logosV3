@@ -26,12 +26,14 @@ pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: Stri
     let deleted_mimic_name = ctx
         .data()
         .with_user_write(user_id, |user| {
-            if let Some(idx) = user.mimics.iter().position(|m| m.name == target) {
-                let removed = user.mimics.remove(idx);
-                Ok(removed.name)
-            } else {
-                Err(MimicError::MimicNotFound)
-            }
+            let idx = user
+                .mimics
+                .iter()
+                .position(|m| m.name == target)
+                .ok_or(MimicError::MimicNotFound)?;
+
+            let removed = user.mimics.remove(idx);
+            Ok(removed.name)
         })
         .await?;
 
@@ -74,7 +76,7 @@ pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
     Ok(())
 }
 
-/// /mimic delete active_mimic: deletes your active_mimic, ignoring channel_override settings.
+/// /mimic delete active_mimic: unsets your active_mimic, ignoring channel_override settings.
 #[poise::command(slash_command)]
 pub async fn active_mimic(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;

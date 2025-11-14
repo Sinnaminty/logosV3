@@ -26,12 +26,14 @@ pub async fn active_mimic(
     let mimic_name = ctx
         .data()
         .with_user_write(user_id, |user| {
-            if let Some(m) = user.mimics.iter().find(|m| m.name == target) {
-                user.active_mimic = Some(m.clone());
-                Ok(m.name.clone())
-            } else {
-                Err(MimicError::NoActiveMimic)
-            }
+            let m = user
+                .mimics
+                .iter()
+                .find(|m| m.name == target)
+                .ok_or(MimicError::MimicNotFound)?;
+            user.active_mimic = Some(m.clone());
+
+            Ok(m.name.clone())
         })
         .await?;
 
@@ -60,12 +62,14 @@ pub async fn channel_override(
     let mimic_name = ctx
         .data()
         .with_user_write(user_id, |user| {
-            if let Some(m) = user.mimics.iter().find(|m| m.name == target) {
-                user.channel_override.insert(channel_id, m.clone());
-                Ok(m.name.clone())
-            } else {
-                Err(MimicError::MimicNotFound)
-            }
+            let m = user
+                .mimics
+                .iter()
+                .find(|m| m.name == target)
+                .ok_or(MimicError::MimicNotFound)?;
+
+            user.channel_override.insert(channel_id, m.clone());
+            Ok(m.name.clone())
         })
         .await?;
 

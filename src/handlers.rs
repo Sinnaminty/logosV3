@@ -34,10 +34,12 @@ pub fn error_handler(
                 FullEvent::Message { new_message } => match error {
                     PawthosErrors::Mimic(MimicError::NoActiveMimic) => {
                         let user_id = new_message.author.id;
-                        framework
+                        // no error to be found here..
+                        let _ = framework
                             .user_data
                             .with_user_write(user_id, |user| {
                                 user.auto_mode = false;
+                                Ok(())
                             })
                             .await;
 
@@ -90,7 +92,6 @@ pub fn event_handler<'a>(
                         Ok(user.get_active_mimic(channel_id))
                     })
                     .await
-                    .flatten()
                     .flatten()
                 {
                     Ok(m) => m,

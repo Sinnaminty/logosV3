@@ -46,14 +46,15 @@ impl std::error::Error for MimicError {}
 async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
     ctx.data()
         .with_user_read(ctx.author().id, |user| {
-            user.mimics
+            Ok(user
+                .mimics
                 .iter()
                 .filter_map(|m| {
                     m.name
                         .starts_with(partial)
                         .then_some(AutocompleteChoice::new(m.name.clone(), m.name.clone()))
                 })
-                .collect()
+                .collect())
         })
         .await
         .unwrap_or_default()
@@ -81,7 +82,9 @@ pub async fn add(
     let att_url = attachment.as_ref().map(|a| a.url.clone());
     let avatar_url = att_url.or(avatar_url);
 
-    ctx.data()
+    // no error here...
+    let _ = ctx
+        .data()
         .with_user_write(user_id, |user| {
             let m = Mimic {
                 name: name.clone(),
@@ -89,6 +92,7 @@ pub async fn add(
             };
             user.add_mimic(m.clone());
             user.active_mimic = Some(m);
+            Ok(())
         })
         .await;
 
@@ -109,7 +113,8 @@ pub async fn list(ctx: Context<'_>) -> Result {
     let reply = ctx
         .data()
         .with_user_read(user_id, |user| {
-            user.mimics
+            Ok(user
+                .mimics
                 .iter()
                 .map(|m| {
                     let mut embed = Embed::new().title(m.name.clone());
@@ -118,7 +123,7 @@ pub async fn list(ctx: Context<'_>) -> Result {
                     }
                     embed
                 })
-                .fold(Reply::default(), |r, e| r.embed(e))
+                .fold(Reply::default(), |r, e| r.embed(e)))
         })
         .await?;
 
@@ -136,7 +141,7 @@ pub async fn say(
     let channel_id = ctx.channel_id();
     let selected_mimic = ctx
         .data()
-        .with_user_read(user_id, |user| user.get_active_mimic(channel_id))
+        .with_user_read(user_id, |user| Ok(user.get_active_mimic(channel_id)))
         .await??;
 
     let webhook = utils::get_or_create_webhook(ctx.http(), channel_id).await?;
