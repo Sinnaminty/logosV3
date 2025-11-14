@@ -1,5 +1,3 @@
-use std::fmt::write;
-
 use crate::commands::mimic::{delete::*, set::*};
 use crate::pawthos::{
     enums::embed_type::EmbedType,
@@ -20,6 +18,7 @@ pub enum MimicError {
     AutoModeFalse,
     NoChannelOverride,
     MimicNotFound,
+    DeleteActiveMimicWithAutoModeEnabled,
 }
 
 impl std::fmt::Display for MimicError {
@@ -32,7 +31,10 @@ impl std::fmt::Display for MimicError {
                 write!(f, "There is not a channel override set for this channel!")
             }
             MimicError::MimicNotFound => {
-                write!(f, "That mimic doesn't exist!")
+                write!(f, "That Mimic doesn't exist!")
+            }
+            MimicError::DeleteActiveMimicWithAutoModeEnabled => {
+                write!(f, "Cannot delete active Mimic with auto_mode enabled!")
             }
         }
     }

@@ -81,6 +81,9 @@ pub async fn active_mimic(ctx: Context<'_>) -> Result {
     let mimic_name = ctx
         .data()
         .with_user_write(user_id, |user| {
+            if user.auto_mode {
+                return Err(MimicError::DeleteActiveMimicWithAutoModeEnabled);
+            }
             let Some(m) = user.active_mimic.take() else {
                 return Err(MimicError::NoActiveMimic);
             };
@@ -91,7 +94,7 @@ pub async fn active_mimic(ctx: Context<'_>) -> Result {
 
     let embed = utils::create_embed_builder(
         "Mimic Delete active_mimic",
-        format!("Successfully deleted your active_mimic :{}", mimic_name),
+        format!("Successfully deleted your active_mimic: {}", mimic_name),
         EmbedType::Good,
     );
 

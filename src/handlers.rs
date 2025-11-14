@@ -10,7 +10,6 @@ use poise::serenity_prelude as serenity;
 use serenity::{ExecuteWebhook, FullEvent};
 use std::pin::Pin;
 
-// TODO: rewrite error handling system in it's entirety.
 pub fn error_handler(
     error: FrameworkError<'_, Data, Error>,
 ) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
