@@ -19,14 +19,10 @@ impl MimicUser {
     }
     /// gets this user's active_mimic, returning the correct channel_override if it exists.
     pub fn get_active_mimic(&self, channel_id: ChannelId) -> Result<Mimic, MimicError> {
-        match self
-            .channel_override
+        self.channel_override
             .get(&channel_id)
             .cloned()
             .or_else(|| self.active_mimic.clone())
-        {
-            Some(m) => Ok(m),
-            None => Err(MimicError::NoActiveMimic),
-        }
+            .ok_or(MimicError::NoActiveMimic)
     }
 }

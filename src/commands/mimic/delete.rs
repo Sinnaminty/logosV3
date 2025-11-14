@@ -56,9 +56,11 @@ pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
     let mimic_name = ctx
         .data()
         .with_user_write(user_id, |user| {
-            let Some(m) = user.channel_override.remove(&channel_id) else {
-                return Err(MimicError::NoChannelOverride);
-            };
+            let m = user
+                .channel_override
+                .remove(&channel_id)
+                .ok_or(MimicError::NoChannelOverride)?;
+
             Ok(m.name)
         })
         .await?;
@@ -86,10 +88,8 @@ pub async fn active_mimic(ctx: Context<'_>) -> Result {
             if user.auto_mode {
                 return Err(MimicError::DeleteActiveMimicWithAutoModeEnabled);
             }
-            let Some(m) = user.active_mimic.take() else {
-                return Err(MimicError::NoActiveMimic);
-            };
 
+            let m = user.active_mimic.take().ok_or(MimicError::NoActiveMimic)?;
             Ok(m.name)
         })
         .await?;
