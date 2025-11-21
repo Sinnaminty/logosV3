@@ -1,9 +1,6 @@
-use crate::{
-    commands::mimic::MimicError,
-    pawthos::{
-        enums::embed_type::EmbedType,
-        types::{Context, Reply, Result},
-    },
+use crate::pawthos::{
+    enums::{embed_type::EmbedType, mimic_errors::MimicError},
+    types::{Context, Reply, Result},
 };
 use crate::{commands::mimic::fetch_mimics, utils};
 use poise::serenity_prelude::Channel;
@@ -25,7 +22,7 @@ pub async fn active_mimic(
 
     let mimic_name = ctx
         .data()
-        .with_user_write(user_id, |user| {
+        .with_mimic_user_write(user_id, |user| {
             let m = user
                 .mimics
                 .iter()
@@ -61,7 +58,7 @@ pub async fn channel_override(
 
     let mimic_name = ctx
         .data()
-        .with_user_write(user_id, |user| {
+        .with_mimic_user_write(user_id, |user| {
             let m = user
                 .mimics
                 .iter()
@@ -102,7 +99,7 @@ pub async fn auto(
 
     let outcome = ctx
         .data()
-        .with_user_write(user_id, |user| {
+        .with_mimic_user_write(user_id, |user| {
             if user.active_mimic.is_none() {
                 return Err(MimicError::NoActiveMimic);
             }

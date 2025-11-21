@@ -1,6 +1,5 @@
-use crate::commands::mimic::MimicError;
-use crate::pawthos::enums::embed_type::EmbedType;
 use crate::pawthos::enums::pawthos_errors::PawthosErrors;
+use crate::pawthos::enums::{embed_type::EmbedType, mimic_errors::MimicError};
 use crate::pawthos::structs::data::Data;
 use crate::pawthos::types::Error;
 use crate::pawthos::types::Reply;
@@ -37,7 +36,7 @@ pub fn error_handler(
                         // no error to be found here..
                         let _ = framework
                             .user_data
-                            .with_user_write(user_id, |user| {
+                            .with_mimic_user_write(user_id, |user| {
                                 user.auto_mode = false;
                                 Ok(())
                             })
@@ -85,7 +84,7 @@ pub fn event_handler<'a>(
                 // with_user_read only throws NoMimicUserFound error. if no mimic user is found in
                 // the message callback, it isn't a big deal
                 let selected_mimic = match data
-                    .with_user_read(user_id, |user| {
+                    .with_mimic_user_read(user_id, |user| {
                         if !user.auto_mode {
                             return Err(MimicError::AutoModeFalse);
                         }

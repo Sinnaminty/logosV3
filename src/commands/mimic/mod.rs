@@ -10,42 +10,10 @@ use serenity::{AutocompleteChoice, ExecuteWebhook};
 mod delete;
 mod set;
 
-// TODO: Define errors here.
-#[derive(Debug)]
-pub enum MimicError {
-    NoUserFound,
-    NoActiveMimic,
-    AutoModeFalse,
-    NoChannelOverride,
-    MimicNotFound,
-    DeleteActiveMimicWithAutoModeEnabled,
-}
-
-impl std::fmt::Display for MimicError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MimicError::NoUserFound => write!(f, "No Mimic User found in Mimic User Database!"),
-            MimicError::NoActiveMimic => write!(f, "User has no active Mimic Set!"),
-            MimicError::AutoModeFalse => write!(f, "Auto mode is false!"),
-            MimicError::NoChannelOverride => {
-                write!(f, "There is not a channel override set for this channel!")
-            }
-            MimicError::MimicNotFound => {
-                write!(f, "That Mimic doesn't exist!")
-            }
-            MimicError::DeleteActiveMimicWithAutoModeEnabled => {
-                write!(f, "Cannot delete active Mimic with auto_mode enabled!")
-            }
-        }
-    }
-}
-
-impl std::error::Error for MimicError {}
-
 /// Returns AutocompleteChoices to the Mimic slash commands that request Mimic Autocompletes.
 async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
     ctx.data()
-        .with_user_read(ctx.author().id, |user| {
+        .with_mimic_user_read(ctx.author().id, |user| {
             Ok(user
                 .mimics
                 .iter()
@@ -85,7 +53,7 @@ pub async fn add(
     // no error here...
     let _ = ctx
         .data()
-        .with_user_write(user_id, |user| {
+        .with_mimic_user_write(user_id, |user| {
             let m = Mimic {
                 name: name.clone(),
                 avatar_url,
@@ -112,7 +80,7 @@ pub async fn list(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
     let reply = ctx
         .data()
-        .with_user_read(user_id, |user| {
+        .with_mimic_user_read(user_id, |user| {
             Ok(user
                 .mimics
                 .iter()
@@ -141,7 +109,7 @@ pub async fn say(
     let channel_id = ctx.channel_id();
     let selected_mimic = ctx
         .data()
-        .with_user_read(user_id, |user| Ok(user.get_active_mimic(channel_id)))
+        .with_mimic_user_read(user_id, |user| Ok(user.get_active_mimic(channel_id)))
         .await??;
 
     let webhook = utils::get_or_create_webhook(ctx.http(), channel_id).await?;
