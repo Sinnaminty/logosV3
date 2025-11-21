@@ -1,16 +1,33 @@
+use crate::commands::{mimic::*, oot::*, schedule::*, vox::*};
 use crate::pawthos::{
     enums::embed_type::EmbedType,
     structs::data::Data,
     types::{Context, Error, Reply, Result},
 };
-use crate::{commands::mimic::*, commands::oot::*, commands::vox::*, utils};
+use crate::utils;
 use poise::serenity_prelude as serenity;
-pub(crate) mod mimic;
+mod mimic;
 mod oot;
+mod schedule;
 mod vox;
 
 pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
-    vec![oot(), pfp(), register(), vox(), mimic()]
+    vec![oot(), pfp(), register(), vox(), mimic(), schedule()]
+}
+
+#[poise::command(slash_command)]
+pub async fn help(
+    ctx: Context<'_>,
+    #[description = "Specific command to show help about"] command: Option<String>,
+) -> Result {
+    let config = poise::builtins::HelpConfiguration {
+        show_subcommands: true,
+        include_description: true,
+        ..Default::default()
+    };
+
+    poise::builtins::help(ctx, command.as_deref(), config).await?;
+    Ok(())
 }
 
 // NOTE: add the ability to grab both global pfp and guild.

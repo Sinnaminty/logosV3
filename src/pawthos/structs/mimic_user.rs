@@ -1,4 +1,4 @@
-use crate::{commands::mimic::MimicError, pawthos::structs::mimic::Mimic};
+use crate::{pawthos::enums::mimic_errors::MimicError, pawthos::structs::mimic::Mimic};
 use poise::serenity_prelude::ChannelId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
