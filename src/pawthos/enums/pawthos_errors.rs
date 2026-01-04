@@ -1,5 +1,6 @@
-use crate::commands::mimic::MimicError;
 use crate::dectalk::DectalkError;
+use crate::pawthos::enums::mimic_errors::MimicError;
+use crate::pawthos::enums::schedule_errors::ScheduleError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum PawthosErrors {
@@ -25,4 +26,13 @@ pub enum PawthosErrors {
 
     #[error("MimicError: {0}")]
     Mimic(#[from] MimicError),
+
+    #[error("ScheduleError: {0}")]
+    Schedule(#[from] ScheduleError),
+}
+
+impl From<chrono::ParseError> for PawthosErrors {
+    fn from(value: chrono::ParseError) -> Self {
+        PawthosErrors::Schedule(ScheduleError::ParseError(value))
+    }
 }

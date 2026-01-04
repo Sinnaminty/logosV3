@@ -1,9 +1,6 @@
-use crate::{
-    commands::mimic::MimicError,
-    pawthos::{
-        enums::embed_type::EmbedType,
-        types::{Context, Reply, Result},
-    },
+use crate::pawthos::{
+    enums::{embed_type::EmbedType, mimic_errors::MimicError},
+    types::{Context, Reply, Result},
 };
 use crate::{commands::mimic::fetch_mimics, utils};
 use poise::serenity_prelude::Channel;
@@ -25,7 +22,7 @@ pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: Stri
 
     let deleted_mimic_name = ctx
         .data()
-        .with_user_write(user_id, |user| {
+        .with_mimic_user_write(user_id, |user| {
             let idx = user
                 .mimics
                 .iter()
@@ -55,7 +52,7 @@ pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
 
     let mimic_name = ctx
         .data()
-        .with_user_write(user_id, |user| {
+        .with_mimic_user_write(user_id, |user| {
             let m = user
                 .channel_override
                 .remove(&channel_id)
@@ -84,7 +81,7 @@ pub async fn active_mimic(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
     let mimic_name = ctx
         .data()
-        .with_user_write(user_id, |user| {
+        .with_mimic_user_write(user_id, |user| {
             if user.auto_mode {
                 return Err(MimicError::DeleteActiveMimicWithAutoModeEnabled);
             }

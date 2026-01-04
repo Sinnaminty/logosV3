@@ -9,7 +9,7 @@ pub async fn vox(_: Context<'_>) -> Result {
     panic!();
 }
 
-/// Vox Say:
+/// Genereates a sound file with the Dectalk API.
 #[poise::command(slash_command)]
 pub async fn say(
     ctx: Context<'_>,
