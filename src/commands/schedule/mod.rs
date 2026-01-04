@@ -51,6 +51,7 @@ pub async fn add(
         .await?;
 
     // this is the local date time :3c
+    // FIXME: is this unwrap dangerous?
     let local_dt = naive_dt.and_local_timezone(local_tz).unwrap();
 
     let embed = utils::create_embed_builder(

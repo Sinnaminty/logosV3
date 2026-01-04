@@ -12,7 +12,7 @@ mod schedule;
 mod vox;
 
 pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
-    vec![oot(), pfp(), register(), vox(), mimic(), schedule()]
+    vec![oot(), pfp(), register(), vox(), mimic(), schedule(), help()]
 }
 
 #[poise::command(slash_command)]
@@ -30,7 +30,8 @@ pub async fn help(
     Ok(())
 }
 
-// NOTE: add the ability to grab both global pfp and guild.
+// TODO: add the ability to grab both global pfp and guild.
+
 /// Displays the calling users' profile picture
 #[poise::command(slash_command)]
 pub async fn pfp(

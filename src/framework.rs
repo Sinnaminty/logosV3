@@ -96,12 +96,11 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
                         let http = http.clone(); // three.
                         tokio::spawn(async move {
                             let now = chrono::Utc::now();
-                            let time_delta = event
-                                .when
-                                .signed_duration_since(now)
-                                .abs()
-                                .to_std()
-                                .expect("Time Delta should not be negative.");
+                            let Ok(time_delta) = event.when.signed_duration_since(now).to_std()
+                            else {
+                                log::warn!("Event in past: {:#?}", event);
+                                return;
+                            };
 
                             tokio::time::sleep(time_delta).await;
                             // send the user a message.

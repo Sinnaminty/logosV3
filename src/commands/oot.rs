@@ -11,7 +11,7 @@ pub async fn oot(_: Context<'_>) -> Result {
     panic!();
 }
 
-/// Add a SoH OOt Randomizer json file to Logos.
+/// Add a SoH OOt Randomizer json file to Logos. NOT FINISHED.
 #[poise::command(slash_command)]
 pub async fn add(
     ctx: Context<'_>,
@@ -39,6 +39,7 @@ pub async fn add(
     Ok(())
 }
 
+/// Hint for an item. NOT FINISHED
 #[poise::command(slash_command)]
 pub async fn hint(_ctx: Context<'_>) -> Result {
     todo!();
