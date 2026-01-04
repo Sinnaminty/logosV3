@@ -126,10 +126,13 @@ pub async fn delete(
 }
 
 async fn fetch_timezones(_ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
+    let partial = &partial.to_lowercase();
+
     TZ_VARIANTS
         .into_iter()
         .filter_map(|tz| {
             tz.to_string()
+                .to_lowercase()
                 .contains(partial)
                 .then_some(AutocompleteChoice::new(tz.name(), tz.name()))
         })
