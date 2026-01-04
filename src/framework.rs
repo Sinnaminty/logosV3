@@ -86,14 +86,14 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
-            let http = ctx.http.clone();
+            let http = ctx.http.clone(); // one.
             let (send_tasks, mut recv_tasks) =
                 tokio::sync::mpsc::unbounded_channel::<(UserId, ScheduleEvent)>();
             tokio::spawn({
-                let http = http.clone();
+                let http = http.clone(); // two.
                 async move {
                     while let Some((id, event)) = recv_tasks.recv().await {
-                        let http = http.clone();
+                        let http = http.clone(); // three.
                         tokio::spawn(async move {
                             let now = chrono::Utc::now();
                             let time_delta = event
@@ -102,6 +102,7 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
                                 .abs()
                                 .to_std()
                                 .expect("Time Delta should not be negative.");
+
                             tokio::time::sleep(time_delta).await;
                             // send the user a message.
                             if let Ok(dm) = id.create_dm_channel(&http).await {
