@@ -1,8 +1,6 @@
 use crate::pawthos::enums::persistant_data::PersistantData;
 use crate::pawthos::structs::data::Data;
-use crate::pawthos::structs::mimic_db::MimicDB;
 use crate::pawthos::structs::mimic_user::MimicUser;
-use crate::pawthos::structs::schedule_db::ScheduleDB;
 use crate::pawthos::structs::schedule_user::ScheduleUser;
 use crate::pawthos::structs::user_db::UserDB;
 use poise::serenity_prelude::UserId;
