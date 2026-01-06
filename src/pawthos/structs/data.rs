@@ -1,9 +1,10 @@
 use crate::pawthos::enums::mimic_errors::MimicError;
 use crate::pawthos::enums::persistant_data::PersistantData;
 use crate::pawthos::enums::schedule_errors::ScheduleError;
+use crate::pawthos::structs::mimic_user::MimicUser;
 use crate::pawthos::structs::schedule_event::ScheduleEvent;
 use crate::pawthos::structs::schedule_user::ScheduleUser;
-use crate::pawthos::structs::{mimic_db::MimicDB, mimic_user::MimicUser, schedule_db::ScheduleDB};
+use crate::pawthos::structs::user_db::UserDB;
 use crate::pawthos::traits::{MimicDbMarker, ScheduleDbMarker, UserDbSpec};
 use poise::serenity_prelude::UserId;
 use tokio::sync::RwLock;
@@ -11,8 +12,7 @@ use tokio::sync::RwLock;
 /// User data, which is stored and accessible in all command invocations
 #[derive(Debug)]
 pub struct Data {
-    pub mimic_db: RwLock<MimicDB>,
-    pub schedule_db: RwLock<ScheduleDB>,
+    pub user_db: RwLock<UserDB>,
     pub persistant_data_channel: tokio::sync::mpsc::Sender<PersistantData>,
     pub schedule_events_channel: tokio::sync::mpsc::UnboundedSender<(UserId, ScheduleEvent)>,
 }
@@ -48,7 +48,7 @@ impl Data {
             .send(DbMarker::to_persistant_data(snapshot))
             .await
         {
-            log::error!("Failted to queue DB save: {:?}", e);
+            log::error!("Failed to queue DB save: {:?}", e);
         }
         result
     }

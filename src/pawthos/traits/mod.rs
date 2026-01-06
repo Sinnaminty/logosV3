@@ -4,6 +4,7 @@ use crate::pawthos::structs::mimic_db::MimicDB;
 use crate::pawthos::structs::mimic_user::MimicUser;
 use crate::pawthos::structs::schedule_db::ScheduleDB;
 use crate::pawthos::structs::schedule_user::ScheduleUser;
+use crate::pawthos::structs::user_db::UserDB;
 use poise::serenity_prelude::UserId;
 use tokio::sync::RwLock;
 
@@ -13,10 +14,8 @@ pub struct ScheduleDbMarker;
 
 /// Describes how to access and persist a particular per-user DB stored inside `Data`.
 pub trait UserDbSpec {
-    /// The full in-memory DB type (e.g. `MimicDB`, `ScheduleDB`).
     type Db: Clone;
 
-    /// The per-user record type (e.g. `MimicUser`, `ScheduleUser`).
     type User;
 
     /// Get the `RwLock` for this DB from `Data`.
@@ -33,43 +32,43 @@ pub trait UserDbSpec {
 }
 
 impl UserDbSpec for MimicDbMarker {
-    type Db = MimicDB;
+    type Db = UserDB;
     type User = MimicUser;
 
     fn db_lock(data: &Data) -> &RwLock<Self::Db> {
-        &data.mimic_db
+        &data.user_db
     }
 
     fn get_user(db: &Self::Db, user_id: UserId) -> Option<&Self::User> {
-        db.get_user(user_id)
+        db.get_user(user_id).map(|u| &u.mimic)
     }
 
     fn get_user_mut(db: &mut Self::Db, user_id: UserId) -> &mut Self::User {
-        db.get_user_mut(user_id)
+        &mut db.get_user_mut(user_id).mimic
     }
 
     fn to_persistant_data(db: Self::Db) -> PersistantData {
-        PersistantData::MimicDB(db)
+        PersistantData::UserDB(db)
     }
 }
 
 impl UserDbSpec for ScheduleDbMarker {
-    type Db = ScheduleDB;
+    type Db = UserDB;
     type User = ScheduleUser;
 
     fn db_lock(data: &Data) -> &RwLock<Self::Db> {
-        &data.schedule_db
+        &data.user_db
     }
 
     fn get_user(db: &Self::Db, user_id: UserId) -> Option<&Self::User> {
-        db.get_user(user_id)
+        db.get_user(user_id).map(|u| &u.schedule)
     }
 
     fn get_user_mut(db: &mut Self::Db, user_id: UserId) -> &mut Self::User {
-        db.get_user_mut(user_id)
+        &mut db.get_user_mut(user_id).schedule
     }
 
     fn to_persistant_data(db: Self::Db) -> PersistantData {
-        PersistantData::ScheduleDB(db)
+        PersistantData::UserDB(db)
     }
 }
