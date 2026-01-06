@@ -5,3 +5,4 @@ pub mod schedule_event;
 pub mod schedule_user;
 pub mod user;
 pub mod user_db;
+pub mod wallet_user;

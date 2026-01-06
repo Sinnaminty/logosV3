@@ -9,7 +9,7 @@ use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::UserId;
 use tokio::sync::RwLock;
 
-const BUFFER_SIZE: usize = 1;
+const BUFFER_SIZE: usize = 8;
 
 fn save_user_db(db: UserDB) -> Result {
     let db_json = poise::serenity_prelude::json::to_string(&db)?;

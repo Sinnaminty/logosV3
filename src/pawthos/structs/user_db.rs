@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UserDB {
+    #[serde(default)]
     pub db: HashMap<UserId, User>,
 }
 
