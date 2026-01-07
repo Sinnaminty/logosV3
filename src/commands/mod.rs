@@ -213,13 +213,14 @@ pub async fn set(
     }) {
         r.edit(ctx.http(), EditRole::new().colour(color).name(&name))
             .await?;
-    }
-    //ok.. we need to create a role.
-    let r = guild_id
-        .create_role(ctx.http(), EditRole::new().colour(color).name(name))
-        .await?;
+    } else {
+        //ok.. we need to create a role.
+        let r = guild_id
+            .create_role(ctx.http(), EditRole::new().colour(color).name(name))
+            .await?;
 
-    member.add_role(ctx.http(), r.id).await?;
+        member.add_role(ctx.http(), r.id).await?;
+    }
 
     ctx.send(Reply::default().embed(utils::create_embed_builder(
         "Set Color",
