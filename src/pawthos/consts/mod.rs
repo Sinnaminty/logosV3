@@ -11,3 +11,5 @@ pub const INTENTS: GatewayIntents = {
 
 pub const LOGOS_GREEN: Color = Color::from_rgb(102, 204, 102);
 pub const LOGOS_RED: Color = Color::from_rgb(255, 0, 0);
+pub const FIZZ_ID: u64 = 326389428593623040;
+pub const DAILY_REWARD: i64 = 10;

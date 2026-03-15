@@ -1,5 +1,5 @@
 use crate::pawthos::enums::mimic_errors::MimicError;
-use crate::pawthos::enums::persistant_data::PersistantData;
+use crate::pawthos::enums::persistant_data::{PersistantData, UserDailyClaimed};
 use crate::pawthos::enums::schedule_errors::ScheduleError;
 use crate::pawthos::enums::wallet_errors::WalletError;
 use crate::pawthos::structs::mimic_user::MimicUser;
@@ -8,6 +8,7 @@ use crate::pawthos::structs::schedule_user::ScheduleUser;
 use crate::pawthos::structs::user_db::UserDB;
 use crate::pawthos::structs::wallet_user::WalletUser;
 use crate::pawthos::traits::{MimicDbMarker, ScheduleDbMarker, UserDbSpec, WalletDbMarker};
+use chrono::{Duration, Local, NaiveTime};
 use poise::serenity_prelude::UserId;
 use tokio::sync::RwLock;
 
@@ -130,5 +131,40 @@ impl Data {
     {
         self.with_db_user_write::<WalletDbMarker, _, _>(user_id, |user| f(user))
             .await
+    }
+
+    pub async fn wallet_user_daily(&self, user_id: UserId) -> Result<i64, WalletError> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        self.persistant_data_channel
+            .send(PersistantData::DailyCheck {
+                user_id: user_id.into(),
+                sender: tx,
+            })
+            .await
+            .expect("Persistant Data Channel should be open.");
+
+        let Ok(daily_claimed) = rx.await else {
+            log::error!("recv error in DailyCheck!!");
+            return Err(WalletError::RecvError);
+        };
+
+        //if daily daily_claimed, return daily error
+        //else, add 10 tabs to user account and return number of tabs
+
+        if daily_claimed == UserDailyClaimed::Claimed {
+            let now = Local::now();
+            let midnight = (Local::now() + Duration::days(1))
+                .with_time(NaiveTime::MIN)
+                .unwrap();
+            let remaining = midnight - now;
+
+            Err(WalletError::DailyOnCooldown {
+                remaining_secs: remaining.num_seconds(),
+            })
+        } else {
+            self.with_wallet_user_write(user_id, |user| Ok(user.claim_daily()))
+                .await
+        }
     }
 }

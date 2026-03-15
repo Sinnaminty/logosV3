@@ -1,15 +1,14 @@
 use crate::commands::{mimic::*, schedule::*, vox::*};
+use crate::pawthos::consts::{DAILY_REWARD, FIZZ_ID};
 use crate::pawthos::enums::color_errors::ColorError;
-use crate::pawthos::enums::embed_type;
-use crate::pawthos::enums::wallet_errors::WalletError;
 use crate::pawthos::{
     enums::embed_type::EmbedType,
     structs::data::Data,
     types::{Context, Error, Reply, Result},
 };
-use crate::utils::{self, create_embed_builder};
+use crate::utils::{self};
 use image::ImageEncoder;
-use poise::serenity_prelude::{self as serenity, EditRole, Guild, RoleId};
+use poise::serenity_prelude::{self as serenity, EditRole, RoleId, User};
 mod mimic;
 mod oot;
 mod schedule;
@@ -18,14 +17,15 @@ mod vox;
 pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
     vec![
         daily(),
-        shop(),
+        balance(),
         pfp(),
         register(),
+        give_tabs(),
         vox(),
         mimic(),
         schedule(),
-        help(),
         color(),
+        fix_color_role_names(),
     ]
 }
 
@@ -66,63 +66,36 @@ pub async fn pfp(
 /// Gives you 10 tabs. can only be used once every 24 hours.
 #[poise::command(slash_command)]
 pub async fn daily(ctx: Context<'_>) -> Result {
-    pub const DAILY_REWARD: i64 = 10;
-    pub const DAILY_COOLDOWN_SECS: i64 = 24 * 60 * 60;
-
     let user_id = ctx.author().id;
 
-    let now = chrono::Utc::now().timestamp();
+    let balance = ctx.data().wallet_user_daily(user_id).await?;
 
-    let res = ctx
-        .data()
-        .with_wallet_user_write(user_id, |w| {
-            let elapsed = now - w.last_daily_ts;
-
-            if w.last_daily_ts != 0 && elapsed < DAILY_COOLDOWN_SECS {
-                let remaining = DAILY_COOLDOWN_SECS - elapsed;
-                return Err(WalletError::DailyOnCooldown {
-                    remaining_secs: remaining,
-                });
-            }
-
-            w.tabs += DAILY_REWARD;
-            w.last_daily_ts = now;
-
-            Ok(w.tabs)
-        })
-        .await;
-
-    match res {
-        Ok(new_balance) => {
-            ctx.send(
+    ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("✅ You claimed **{DAILY_REWARD} Tabs**! You now have **{new_balance} Tabs**."))
+                    .content(format!("✅ You claimed **{} <:tab:1459045305084547123>**! You now have **{balance} <:tab:1459045305084547123>**.", DAILY_REWARD),)
                     .ephemeral(true),
             ).await?;
-        }
-        Err(WalletError::DailyOnCooldown { remaining_secs }) => {
-            // nice formatting
-            let hrs = remaining_secs / 3600;
-            let mins = (remaining_secs % 3600) / 60;
-
-            ctx.send(
-                poise::CreateReply::default()
-                    .content(format!(
-                        "⏳ You already claimed your daily Tabs. Try again in **{hrs}h {mins}m**."
-                    ))
-                    .ephemeral(true),
-            )
-            .await?;
-        }
-        Err(e) => return Err(e.into()),
-    }
-
     Ok(())
 }
 
-/// Opens the shop.
+/// Shows how many tabs you have in your wallet.
 #[poise::command(slash_command)]
-pub async fn shop(ctx: Context<'_>) -> Result {
+pub async fn balance(ctx: Context<'_>) -> Result {
+    let user_id = ctx.author().id;
+    let balance = ctx
+        .data()
+        .with_wallet_user_read(user_id, |user| Ok(user.tabs))
+        .await?;
+
+    ctx.send(
+        poise::CreateReply::default()
+            .content(format!(
+                "You have **{balance} <:tab:1459045305084547123>!**"
+            ))
+            .ephemeral(true),
+    )
+    .await?;
+
     Ok(())
 }
 
@@ -135,8 +108,7 @@ pub async fn color(_ctx: Context<'_>) -> Result {
 #[poise::command(slash_command)]
 pub async fn preview(
     ctx: Context<'_>,
-
-    #[description = "User to show pfp of"] color: String,
+    #[description = "Hex code of the color you want to preview."] color: String,
 ) -> Result {
     let trimmed = color.strip_prefix("0x").unwrap_or(&color);
 
@@ -185,32 +157,46 @@ pub async fn set(
     #[description = "Name of your role."] name: String,
     #[description = "Color of your role."] color: String,
 ) -> Result {
-    const FIZZ_ROLE_ID: RoleId = RoleId::new(1441247546163990651);
-    const ADMIN_ROLE_ID: RoleId = RoleId::new(1441247113282326709);
+    const COST: i64 = 10;
     let user_id = ctx.author().id;
     let guild_id = ctx.guild_id().unwrap();
+    // rebinding name with zero-width
+    let name = '\u{200B}'.to_string() + &name;
 
-    ctx.data()
-        .with_wallet_user_read(user_id, |user| {
-            if user.tabs < 10 {
-                return Err(WalletError::NotEnoughTabs);
-            }
-            Ok(())
-        })
-        .await?;
+    log::debug!("inputted name: {name}");
 
     let trimmed = color.strip_prefix("0x").unwrap_or(&color);
 
-    let color = poise::serenity_prelude::Colour::new(
-        u32::from_str_radix(trimmed, 16).map_err(|_| ColorError::IncorrectFormat)?,
-    );
-    let member = ctx.author_member().await.unwrap();
+    let color_integer =
+        u32::from_str_radix(trimmed, 16).map_err(|_| ColorError::IncorrectFormat)?;
 
-    if let Some(mut r) = member.roles(ctx.cache()).and_then(|v| {
-        v.into_iter()
-            .filter(|r| r.id != FIZZ_ROLE_ID && r.id != ADMIN_ROLE_ID)
-            .next_back()
-    }) {
+    let color = if color_integer == 0 {
+        poise::serenity_prelude::Colour::from_rgb(1, 1, 1)
+    } else {
+        poise::serenity_prelude::Colour::new(color_integer)
+    };
+
+    let tabs = ctx
+        .data()
+        .with_wallet_user_write(user_id, |user| user.remove_tabs(COST))
+        .await?;
+
+    let member = guild_id.member(ctx.http(), user_id).await?;
+    let member_role_ids = member.roles.clone();
+    let guild_roles = guild_id.roles(ctx.http()).await?;
+    let member_roles = member_role_ids
+        .iter()
+        .filter_map(|r| guild_roles.get(r))
+        .collect::<Vec<_>>();
+
+    // right.. so let's try to use a zero-width space to determine if this is a color role or not.
+    if let Some(mut r) = member_roles
+        .into_iter()
+        .filter(|r| r.name.starts_with('\u{200B}'))
+        .cloned()
+        .next_back()
+    {
+        log::debug!("role already exists! {}", r.name);
         r.edit(ctx.http(), EditRole::new().colour(color).name(&name))
             .await?;
     } else {
@@ -218,13 +204,14 @@ pub async fn set(
         let r = guild_id
             .create_role(ctx.http(), EditRole::new().colour(color).name(name))
             .await?;
+        log::debug!("makin new role! {}", r.name);
 
         member.add_role(ctx.http(), r.id).await?;
     }
 
     ctx.send(Reply::default().embed(utils::create_embed_builder(
         "Set Color",
-        "Your color has been set!",
+        format!("Your color has been set! You now have **{tabs} <:tab:1459045305084547123>!**"),
         EmbedType::Good,
     )))
     .await?;
@@ -234,7 +221,51 @@ pub async fn set(
 
 #[poise::command(prefix_command)]
 pub async fn register(ctx: Context<'_>) -> Result {
+    if ctx.author().id != FIZZ_ID {
+        return Ok(());
+    }
+
     poise::builtins::register_application_commands_buttons(ctx).await?;
     log::warn!("Debug register command called!!!");
+    Ok(())
+}
+
+#[poise::command(prefix_command)]
+pub async fn give_tabs(ctx: Context<'_>, user: User, tabs: i64) -> Result {
+    if ctx.author().id != FIZZ_ID {
+        return Ok(());
+    }
+    let user_id = user.id;
+    ctx.data()
+        .with_wallet_user_write(user_id, |user| {
+            user.add_tabs(tabs);
+            Ok(())
+        })
+        .await?;
+
+    log::warn!("Gave {} tabs to {}!", tabs, user.name);
+    Ok(())
+}
+
+#[poise::command(prefix_command)]
+pub async fn fix_color_role_names(ctx: Context<'_>, role_id: u64) -> Result {
+    if ctx.author().id != FIZZ_ID {
+        return Ok(());
+    }
+
+    let mut role = ctx
+        .guild_id()
+        .unwrap()
+        .role(ctx.http(), RoleId::new(role_id))
+        .await?;
+
+    if role.name.contains('\u{200B}') {
+        log::warn!("BRO.. this shit already GOT a fuckin THING!!!");
+        return Ok(());
+    }
+    let name = '\u{200B}'.to_string() + &role.name;
+
+    role.edit(ctx.http(), EditRole::new().name(&name)).await?;
+    log::warn!("fixed role name{name}");
     Ok(())
 }
