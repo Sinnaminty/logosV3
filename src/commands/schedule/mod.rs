@@ -1,8 +1,7 @@
 use std::str::FromStr;
 
-use crate::pawthos::enums::embed_type::EmbedType;
 use crate::pawthos::enums::schedule_errors::ScheduleError;
-use crate::pawthos::types::{Context, Reply, Result};
+use crate::pawthos::types::{Context, Result};
 use crate::utils;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use chrono_tz::{TZ_VARIANTS, Tz};
@@ -57,10 +56,9 @@ pub async fn add(
         .single()
         .ok_or(ScheduleError::AmbiguousOrInvalidTime)?;
 
-    let embed = utils::create_embed_builder(
+    let embed_reply = utils::reply_ok(
         "Schedule Add",
         format!("Event {} @ {} Added to your schedule!", name, local_dt),
-        EmbedType::Good,
     );
 
     // no error here.. carry on
@@ -79,7 +77,7 @@ pub async fn add(
         log::error!("Failed to queue reminder task! {}", e);
     }
 
-    ctx.send(Reply::default().embed(embed)).await?;
+    ctx.send(embed_reply).await?;
     Ok(())
 }
 
@@ -88,19 +86,15 @@ pub async fn add(
 pub async fn list(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
     let now = chrono::Utc::now();
-    let embed = ctx
+    let reply = ctx
         .data()
         .with_schedule_user_write(user_id, |u| {
             u.prune_past_events(now);
-            Ok(utils::create_embed_builder(
-                "Schedule list",
-                u.list_events(),
-                EmbedType::Neutral,
-            ))
+            Ok(utils::reply_info("Schedule list", u.list_events()))
         })
         .await?;
 
-    ctx.send(Reply::default().embed(embed)).await?;
+    ctx.send(reply).await?;
     Ok(())
 }
 
@@ -118,13 +112,11 @@ pub async fn delete(
         .with_schedule_user_write(user_id, |user| user.delete_event(event))
         .await?;
 
-    let embed = utils::create_embed_builder(
+    ctx.send(utils::reply_ok(
         "Schedule Delete",
         format!("Successfully deleted {} from your schedule", event_name),
-        EmbedType::Good,
-    );
-
-    ctx.send(Reply::default().embed(embed)).await?;
+    ))
+    .await?;
     Ok(())
 }
 
@@ -158,13 +150,11 @@ pub async fn set_tz(
         })
         .await?;
 
-    let embed = utils::create_embed_builder(
+    ctx.send(utils::reply_ok(
         "Schedule set_tz",
         format!("Timezone set to {}", tz),
-        EmbedType::Good,
-    );
-
-    ctx.send(Reply::default().embed(embed)).await?;
+    ))
+    .await?;
 
     Ok(())
 }

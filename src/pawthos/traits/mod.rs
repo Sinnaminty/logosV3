@@ -31,66 +31,31 @@ pub trait UserDbSpec {
     fn to_persistent_data(db: Self::Db) -> PersistentData;
 }
 
-impl UserDbSpec for MimicDbMarker {
-    type Db = UserDB;
-    type User = MimicUser;
+macro_rules! impl_user_db_spec {
+    ($marker:ident, $user_type:ty, $field:ident) => {
+        impl UserDbSpec for $marker {
+            type Db = UserDB;
+            type User = $user_type;
 
-    fn db_lock(data: &Data) -> &RwLock<Self::Db> {
-        &data.user_db
-    }
+            fn db_lock(data: &Data) -> &RwLock<Self::Db> {
+                &data.user_db
+            }
 
-    fn get_user(db: &Self::Db, user_id: UserId) -> Option<&Self::User> {
-        db.get_user(user_id).map(|u| &u.mimic)
-    }
+            fn get_user(db: &Self::Db, user_id: UserId) -> Option<&Self::User> {
+                db.get_user(user_id).map(|u| &u.$field)
+            }
 
-    fn get_user_mut(db: &mut Self::Db, user_id: UserId) -> &mut Self::User {
-        &mut db.get_user_mut(user_id).mimic
-    }
+            fn get_user_mut(db: &mut Self::Db, user_id: UserId) -> &mut Self::User {
+                &mut db.get_user_mut(user_id).$field
+            }
 
-    fn to_persistent_data(db: Self::Db) -> PersistentData {
-        PersistentData::UserDB(db)
-    }
+            fn to_persistent_data(db: Self::Db) -> PersistentData {
+                PersistentData::UserDB(db)
+            }
+        }
+    };
 }
 
-impl UserDbSpec for ScheduleDbMarker {
-    type Db = UserDB;
-    type User = ScheduleUser;
-
-    fn db_lock(data: &Data) -> &RwLock<Self::Db> {
-        &data.user_db
-    }
-
-    fn get_user(db: &Self::Db, user_id: UserId) -> Option<&Self::User> {
-        db.get_user(user_id).map(|u| &u.schedule)
-    }
-
-    fn get_user_mut(db: &mut Self::Db, user_id: UserId) -> &mut Self::User {
-        &mut db.get_user_mut(user_id).schedule
-    }
-
-    fn to_persistent_data(db: Self::Db) -> PersistentData {
-        PersistentData::UserDB(db)
-    }
-}
-
-impl UserDbSpec for WalletDbMarker {
-    type Db = UserDB;
-
-    type User = WalletUser;
-
-    fn db_lock(data: &Data) -> &RwLock<Self::Db> {
-        &data.user_db
-    }
-
-    fn get_user(db: &Self::Db, user_id: UserId) -> Option<&Self::User> {
-        db.get_user(user_id).map(|u| &u.wallet)
-    }
-
-    fn get_user_mut(db: &mut Self::Db, user_id: UserId) -> &mut Self::User {
-        &mut db.get_user_mut(user_id).wallet
-    }
-
-    fn to_persistent_data(db: Self::Db) -> PersistentData {
-        PersistentData::UserDB(db)
-    }
-}
+impl_user_db_spec!(MimicDbMarker, MimicUser, mimic);
+impl_user_db_spec!(ScheduleDbMarker, ScheduleUser, schedule);
+impl_user_db_spec!(WalletDbMarker, WalletUser, wallet);

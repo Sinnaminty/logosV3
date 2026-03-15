@@ -1,6 +1,5 @@
 use crate::pawthos::enums::embed_type::EmbedType;
-use crate::pawthos::types::Embed;
-use crate::pawthos::types::Error;
+use crate::pawthos::types::{Embed, Error, Reply};
 use poise::serenity_prelude as serenity;
 use serenity::Webhook;
 use std::fmt::Display;
@@ -21,6 +20,18 @@ impl<T, E: std::fmt::Display> ResultExt<T, E> for Result<T, E> {
             }
         }
     }
+}
+
+pub fn reply_ok(title: impl Into<String>, body: impl Into<String>) -> Reply {
+    Reply::default().embed(create_embed_builder(title, body, EmbedType::Good))
+}
+
+pub fn reply_err(title: impl Into<String>, body: impl Into<String>) -> Reply {
+    Reply::default().embed(create_embed_builder(title, body, EmbedType::Bad))
+}
+
+pub fn reply_info(title: impl Into<String>, body: impl Into<String>) -> Reply {
+    Reply::default().embed(create_embed_builder(title, body, EmbedType::Neutral))
 }
 
 pub fn create_embed_builder(

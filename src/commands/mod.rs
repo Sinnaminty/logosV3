@@ -1,5 +1,5 @@
 use crate::commands::{mimic::*, schedule::*, vox::*};
-use crate::pawthos::consts::{DAILY_REWARD, FIZZ_ID};
+use crate::pawthos::consts::{COLOR_PREVIEW_SIZE, COLOR_ROLE_COST, DAILY_REWARD, FIZZ_ID, TAB_EMOJI};
 use crate::pawthos::enums::color_errors::ColorError;
 use crate::pawthos::{
     enums::embed_type::EmbedType,
@@ -10,7 +10,6 @@ use crate::utils::{self};
 use image::ImageEncoder;
 use poise::serenity_prelude::{self as serenity, EditRole, RoleId, User};
 mod mimic;
-mod oot;
 mod schedule;
 mod vox;
 
@@ -73,7 +72,7 @@ pub async fn daily(ctx: Context<'_>) -> Result {
 
     ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("✅ You claimed **{} <:tab:1459045305084547123>**! You now have **{balance} <:tab:1459045305084547123>**.", DAILY_REWARD),)
+                    .content(format!("✅ You claimed **{DAILY_REWARD} {TAB_EMOJI}**! You now have **{balance} {TAB_EMOJI}**.",),)
                     .ephemeral(true),
             ).await?;
     Ok(())
@@ -91,7 +90,7 @@ pub async fn balance(ctx: Context<'_>) -> Result {
     ctx.send(
         poise::CreateReply::default()
             .content(format!(
-                "You have **{balance} <:tab:1459045305084547123>!**"
+                "You have **{balance} {TAB_EMOJI}!**"
             ))
             .ephemeral(true),
     )
@@ -116,8 +115,7 @@ pub async fn preview(
     let color = poise::serenity_prelude::Colour::new(
         u32::from_str_radix(trimmed, 16).map_err(|_| ColorError::IncorrectFormat)?,
     );
-    let size: u32 = 256;
-    let mut img = image::RgbaImage::new(size, size);
+    let mut img = image::RgbaImage::new(COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE);
     for px in img.pixels_mut() {
         *px = image::Rgba([color.r(), color.g(), color.b(), 255]);
     }
@@ -130,7 +128,7 @@ pub async fn preview(
 
         let encoder = PngEncoder::new(&mut png_bytes);
 
-        encoder.write_image(&img, size, size, ColorType::Rgba8.into())?;
+        encoder.write_image(&img, COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE, ColorType::Rgba8.into())?;
     }
 
     let filename = "color.png";
@@ -158,7 +156,6 @@ pub async fn set(
     #[description = "Name of your role."] name: String,
     #[description = "Color of your role."] color: String,
 ) -> Result {
-    const COST: i64 = 10;
     let user_id = ctx.author().id;
     let guild_id = ctx.guild_id().unwrap();
     // rebinding name with zero-width
@@ -208,14 +205,13 @@ pub async fn set(
 
     let tabs = ctx
         .data()
-        .with_wallet_user_write(user_id, |user| user.remove_tabs(COST))
+        .with_wallet_user_write(user_id, |user| user.remove_tabs(COLOR_ROLE_COST))
         .await?;
 
-    ctx.send(Reply::default().embed(utils::create_embed_builder(
+    ctx.send(utils::reply_ok(
         "Set Color",
-        format!("Your color has been set! You now have **{tabs} <:tab:1459045305084547123>!**"),
-        EmbedType::Good,
-    )))
+        format!("Your color has been set! You now have **{tabs} {TAB_EMOJI}!**"),
+    ))
     .await?;
 
     Ok(())

@@ -1,6 +1,6 @@
 use crate::pawthos::{
-    enums::{embed_type::EmbedType, mimic_errors::MimicError},
-    types::{Context, Reply, Result},
+    enums::mimic_errors::MimicError,
+    types::{Context, Result},
 };
 use crate::{commands::mimic::fetch_mimics, utils};
 use poise::serenity_prelude::Channel;
@@ -34,13 +34,11 @@ pub async fn active_mimic(
         })
         .await?;
 
-    let embed = utils::create_embed_builder(
+    ctx.send(utils::reply_ok(
         "Mimic Set active_mimic",
         format!("Your active mimic is set to \"{}\"", mimic_name),
-        EmbedType::Good,
-    );
-
-    ctx.send(Reply::default().embed(embed)).await?;
+    ))
+    .await?;
     Ok(())
 }
 /// /mimic set channel_override: overrides a channel to always display a specific mimic
@@ -70,13 +68,11 @@ pub async fn channel_override(
         })
         .await?;
 
-    let embed = utils::create_embed_builder(
+    ctx.send(utils::reply_ok(
         "Mimic Set channel_override",
         format!("\"{}\" is set to channel \"{}\"", mimic_name, channel),
-        EmbedType::Good,
-    );
-
-    ctx.send(Reply::default().embed(embed)).await?;
+    ))
+    .await?;
     Ok(())
 }
 
@@ -108,13 +104,8 @@ pub async fn auto(
         })
         .await?;
 
-    let embed = utils::create_embed_builder(
-        "Mimic Auto",
-        format!("Auto Mode: {}", outcome),
-        EmbedType::Good,
-    );
-
-    ctx.send(Reply::default().embed(embed)).await?;
+    ctx.send(utils::reply_ok("Mimic Auto", format!("Auto Mode: {}", outcome)))
+        .await?;
 
     Ok(())
 }

@@ -20,6 +20,29 @@ pub struct Data {
     pub schedule_events_channel: tokio::sync::mpsc::UnboundedSender<(UserId, ScheduleEvent)>,
 }
 
+macro_rules! def_db_access {
+    ($read_fn:ident, $write_fn:ident, $marker:ty, $user_type:ty, $err:ty, $no_user:expr) => {
+        pub async fn $read_fn<R, F>(&self, user_id: UserId, f: F) -> Result<R, $err>
+        where
+            F: for<'a> FnOnce(&'a $user_type) -> Result<R, $err>,
+        {
+            self.with_db_user_read::<$marker, _, _>(user_id, |maybe_user| {
+                let user = maybe_user.ok_or($no_user)?;
+                f(user)
+            })
+            .await
+        }
+
+        pub async fn $write_fn<R, F>(&self, user_id: UserId, f: F) -> Result<R, $err>
+        where
+            F: for<'a> FnOnce(&'a mut $user_type) -> Result<R, $err>,
+        {
+            self.with_db_user_write::<$marker, _, _>(user_id, |user| f(user))
+                .await
+        }
+    };
+}
+
 impl Data {
     //private
     async fn with_db_user_read<DbMarker, R, F>(&self, user_id: UserId, f: F) -> R
@@ -59,79 +82,30 @@ impl Data {
     //
     // public interfaces :3c
     //
-    // Mimic
-    //
-    pub async fn with_mimic_user_read<R, F>(&self, user_id: UserId, f: F) -> Result<R, MimicError>
-    where
-        F: for<'a> FnOnce(&'a MimicUser) -> Result<R, MimicError>,
-    {
-        self.with_db_user_read::<MimicDbMarker, _, _>(user_id, |maybe_user| {
-            let user = maybe_user.ok_or(MimicError::NoUserFound)?;
-            f(user)
-        })
-        .await
-    }
-    pub async fn with_mimic_user_write<R, F>(&self, user_id: UserId, f: F) -> Result<R, MimicError>
-    where
-        F: for<'a> FnOnce(&'a mut MimicUser) -> Result<R, MimicError>,
-    {
-        self.with_db_user_write::<MimicDbMarker, _, _>(user_id, |user| f(user))
-            .await
-    }
-
-    //
-    // Schedule
-    //
-    pub async fn with_schedule_user_read<R, F>(
-        &self,
-        user_id: UserId,
-        f: F,
-    ) -> Result<R, ScheduleError>
-    where
-        F: for<'a> FnOnce(&'a ScheduleUser) -> Result<R, ScheduleError>,
-    {
-        self.with_db_user_read::<ScheduleDbMarker, _, _>(user_id, |maybe_user| {
-            let user = maybe_user.ok_or(ScheduleError::NoUserFound)?;
-            f(user)
-        })
-        .await
-    }
-    pub async fn with_schedule_user_write<R, F>(
-        &self,
-        user_id: UserId,
-        f: F,
-    ) -> Result<R, ScheduleError>
-    where
-        F: for<'a> FnOnce(&'a mut ScheduleUser) -> Result<R, ScheduleError>,
-    {
-        self.with_db_user_write::<ScheduleDbMarker, _, _>(user_id, |user| f(user))
-            .await
-    }
-
-    //
-    // Wallet
-    //
-    pub async fn with_wallet_user_read<R, F>(&self, user_id: UserId, f: F) -> Result<R, WalletError>
-    where
-        F: for<'a> FnOnce(&'a WalletUser) -> Result<R, WalletError>,
-    {
-        self.with_db_user_read::<WalletDbMarker, _, _>(user_id, |maybe_user| {
-            let user = maybe_user.ok_or(WalletError::NoUserFound)?;
-            f(user)
-        })
-        .await
-    }
-    pub async fn with_wallet_user_write<R, F>(
-        &self,
-        user_id: UserId,
-        f: F,
-    ) -> Result<R, WalletError>
-    where
-        F: for<'a> FnOnce(&'a mut WalletUser) -> Result<R, WalletError>,
-    {
-        self.with_db_user_write::<WalletDbMarker, _, _>(user_id, |user| f(user))
-            .await
-    }
+    def_db_access!(
+        with_mimic_user_read,
+        with_mimic_user_write,
+        MimicDbMarker,
+        MimicUser,
+        MimicError,
+        MimicError::NoUserFound
+    );
+    def_db_access!(
+        with_schedule_user_read,
+        with_schedule_user_write,
+        ScheduleDbMarker,
+        ScheduleUser,
+        ScheduleError,
+        ScheduleError::NoUserFound
+    );
+    def_db_access!(
+        with_wallet_user_read,
+        with_wallet_user_write,
+        WalletDbMarker,
+        WalletUser,
+        WalletError,
+        WalletError::NoUserFound
+    );
 
     pub async fn wallet_user_daily(&self, user_id: UserId) -> Result<i64, WalletError> {
         let (tx, rx) = tokio::sync::oneshot::channel();

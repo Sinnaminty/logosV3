@@ -1,10 +1,9 @@
 use crate::commands::mimic::{delete::*, set::*};
 use crate::pawthos::{
-    enums::embed_type::EmbedType,
     structs::mimic::Mimic,
     types::{Context, Embed, Reply, Result},
 };
-use crate::utils::{self, create_embed_builder};
+use crate::utils;
 use poise::serenity_prelude as serenity;
 use serenity::{AutocompleteChoice, ExecuteWebhook};
 mod delete;
@@ -62,13 +61,11 @@ pub async fn add(
         })
         .await?;
 
-    let embed = utils::create_embed_builder(
+    ctx.send(utils::reply_ok(
         "Mimic Add",
         format!("Success! Your mimic \"{}\" has been added :3c", name),
-        EmbedType::Good,
-    );
-
-    ctx.send(Reply::default().embed(embed)).await?;
+    ))
+    .await?;
     Ok(())
 }
 
@@ -90,11 +87,7 @@ pub async fn list(ctx: Context<'_>) -> Result {
                     embed
                 })
                 .fold(
-                    Reply::default().embed(create_embed_builder(
-                        "Mimic List",
-                        "",
-                        EmbedType::Neutral,
-                    )),
+                    utils::reply_info("Mimic List", ""),
                     |r, e| r.embed(e),
                 ))
         })

@@ -1,6 +1,6 @@
 use crate::pawthos::{
-    enums::{embed_type::EmbedType, mimic_errors::MimicError},
-    types::{Context, Reply, Result},
+    enums::mimic_errors::MimicError,
+    types::{Context, Result},
 };
 use crate::{commands::mimic::fetch_mimics, utils};
 use poise::serenity_prelude::Channel;
@@ -34,13 +34,11 @@ pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: Stri
         })
         .await?;
 
-    let embed = utils::create_embed_builder(
+    ctx.send(utils::reply_ok(
         "Mimic Delete Mimic",
         format!("You deleted \"{}\"!", deleted_mimic_name),
-        EmbedType::Good,
-    );
-
-    ctx.send(Reply::default().embed(embed)).await?;
+    ))
+    .await?;
     Ok(())
 }
 
@@ -62,16 +60,14 @@ pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
         })
         .await?;
 
-    let embed = utils::create_embed_builder(
+    ctx.send(utils::reply_ok(
         "Mimic Delete channel_override",
         format!(
             "Successfully deleted {}'s channel override for channel {}",
             mimic_name, channel
         ),
-        EmbedType::Good,
-    );
-
-    ctx.send(Reply::default().embed(embed)).await?;
+    ))
+    .await?;
     Ok(())
 }
 
@@ -91,12 +87,10 @@ pub async fn active_mimic(ctx: Context<'_>) -> Result {
         })
         .await?;
 
-    let embed = utils::create_embed_builder(
+    ctx.send(utils::reply_ok(
         "Mimic Delete active_mimic",
         format!("Successfully deleted your active_mimic: {}", mimic_name),
-        EmbedType::Good,
-    );
-
-    ctx.send(Reply::default().embed(embed)).await?;
+    ))
+    .await?;
     Ok(())
 }
