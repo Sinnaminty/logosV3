@@ -1,3 +1,20 @@
+//! Poise framework construction and persistence background task.
+//!
+//! This module does the bulk of the bot's startup work:
+//!
+//! 1. **Load the user database** from `user.json` (or start fresh).
+//! 2. **Spawn the persistence task** — a `tokio::spawn` loop that receives
+//!    [`PersistentData`] messages and writes them to disk.  Routing all I/O
+//!    through a single channel ensures that concurrent commands never race on
+//!    file writes.
+//! 3. **Spawn the schedule reminder task** — an outer loop receives
+//!    `(UserId, ScheduleEvent)` pairs and spawns per-event `tokio::time::sleep`
+//!    tasks that DM the user when the event time arrives.
+//! 4. **Re-queue persisted events** — on every startup, all events currently
+//!    in the database are sent to the reminder task so reminders survive bot
+//!    restarts.
+//! 5. **Build and return the [`poise::Framework`]**.
+
 use crate::commands;
 use crate::handlers;
 use crate::pawthos::enums::persistent_data::PersistentData;
@@ -12,8 +29,20 @@ use serde::Deserialize;
 use serde::Serialize;
 use tokio::sync::RwLock;
 
+/// Internal channel buffer size for the persistence task.
+///
+/// A small buffer is fine here because writes are cheap and the persistence
+/// task keeps up easily with normal usage.
 const BUFFER_SIZE: usize = 8;
 
+// ---------------------------------------------------------------------------
+// User DB persistence
+// ---------------------------------------------------------------------------
+
+/// Write `db` to `user.json` atomically (write to `.tmp`, then rename).
+///
+/// The atomic rename prevents a partially-written file from corrupting the
+/// database if the process is killed mid-write.
 fn save_user_db(db: UserDB) -> Result {
     let db_json = poise::serenity_prelude::json::to_string(&db)?;
     std::fs::write("user.json.tmp", &db_json)?;
@@ -21,6 +50,11 @@ fn save_user_db(db: UserDB) -> Result {
     log::debug!("user.json saved :3c");
     Ok(())
 }
+
+/// Load the user database from `user.json`.
+///
+/// Falls back to an empty [`UserDB`] if the file is absent or malformed,
+/// logging a warning/error accordingly so the operator knows what happened.
 fn load_user_db() -> UserDB {
     let user_db = std::fs::read_to_string("user.json").map(serenity::json::from_str::<UserDB>);
 
@@ -40,12 +74,24 @@ fn load_user_db() -> UserDB {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Wallet list (daily claim tracking)
+// ---------------------------------------------------------------------------
+
+/// The daily-claim tracking file, persisted as `wallet_list.json`.
+///
+/// The list resets automatically when [`WalletList::date`] falls behind the
+/// current local date — no cron job or scheduled reset is needed.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct WalletList {
+    /// The date for which `list` was last updated.
     date: chrono::NaiveDate,
+
+    /// Raw user IDs of users who have already claimed today.
     list: Vec<u64>,
 }
 
+/// Write `wallet_list` to `wallet_list.json` atomically.
 fn save_wallet_list(wallet_list: WalletList) -> Result {
     const FILE_PATH: &str = "wallet_list.json";
     let wallet_list_json = poise::serenity_prelude::json::to_string(&wallet_list)?;
@@ -56,6 +102,7 @@ fn save_wallet_list(wallet_list: WalletList) -> Result {
     Ok(())
 }
 
+/// Load `wallet_list.json`, returning an empty list on missing/corrupt file.
 fn load_wallet_list() -> Result<WalletList, Error> {
     const FILE_PATH: &str = "wallet_list.json";
     let wallet_list =
@@ -76,6 +123,13 @@ fn load_wallet_list() -> Result<WalletList, Error> {
         }
     }
 }
+
+/// Check whether user `id` has already claimed their daily reward today, and
+/// if not, mark them as having claimed it.
+///
+/// The wallet list resets when its stored `date` is earlier than today. All
+/// I/O is synchronous because this runs inside the single-threaded persistence
+/// task loop (no async needed, no risk of concurrent access).
 fn daily_check(id: u64) -> Result<UserDailyClaimed, Error> {
     let mut wallet_list = load_wallet_list()?;
 
@@ -100,9 +154,21 @@ fn daily_check(id: u64) -> Result<UserDailyClaimed, Error> {
     Ok(result)
 }
 
+// ---------------------------------------------------------------------------
+// Framework construction
+// ---------------------------------------------------------------------------
+
+/// Build and return the configured [`poise::Framework`].
+///
+/// This is the primary entry point called from [`crate::setup`]. See the
+/// module-level documentation for the full startup sequence.
 pub fn setup_framework() -> poise::Framework<Data, Error> {
     let user_db = load_user_db();
 
+    // --- Persistence task ---------------------------------------------------
+    // All DB snapshots and daily-check requests flow through this channel.
+    // The task runs forever (until the process exits) and handles one message
+    // at a time, serialising all file I/O.
     let (send, mut recv) = tokio::sync::mpsc::channel(BUFFER_SIZE);
     tokio::spawn(async move {
         while let Some(update) = recv.recv().await {
@@ -145,6 +211,12 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
         })
         .setup(|ctx, _ready, framework| {
             let http = ctx.http.clone(); // one.
+
+            // --- Schedule reminder task -------------------------------------
+            // The outer loop receives (UserId, ScheduleEvent) pairs and spawns
+            // a dedicated sleep task for each one. The three clones of `http`
+            // satisfy Tokio's `'static` requirement for spawned futures without
+            // copying any real data (just an Arc bump).
             let (send_tasks, mut recv_tasks) =
                 tokio::sync::mpsc::unbounded_channel::<(UserId, ScheduleEvent)>();
             tokio::spawn({
@@ -178,6 +250,7 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
                 }
             });
 
+            // Re-queue all events that survived a bot restart.
             let send2 = send_tasks.clone();
             user_db.get_events().into_iter().for_each(|pair| {
                 if let Err(e) = send2.send(pair) {

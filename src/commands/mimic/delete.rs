@@ -1,3 +1,13 @@
+//! `/mimic delete` subcommands — remove mimics and overrides.
+//!
+//! All three subcommands mutate the calling user's [`MimicUser`] record:
+//!
+//! - [`mimic`] — permanently remove a mimic from your list.
+//! - [`active_mimic`] — un-set your active mimic (blocked if auto-mode is on).
+//! - [`channel_override`] — remove the override for a specific channel.
+//!
+//! [`MimicUser`]: crate::pawthos::structs::mimic_user::MimicUser
+
 use crate::pawthos::{
     enums::mimic_errors::MimicError,
     types::{Context, Result},
@@ -5,7 +15,7 @@ use crate::pawthos::{
 use crate::{commands::mimic::fetch_mimics, utils};
 use poise::serenity_prelude::Channel;
 
-/// /mimic delete: commands meant for deleting things :3c
+/// Mimic deletion subcommands.
 #[poise::command(
     slash_command,
     subcommands("mimic", "channel_override", "active_mimic")
@@ -14,7 +24,11 @@ pub async fn delete(_ctx: Context<'_>) -> Result {
     Ok(())
 }
 
-/// /mimic delete mimic: delete one of your mimics (noooo,,,,)
+/// Permanently delete one of your mimics.
+///
+/// Autocomplete lists your existing mimics. Deleting the active mimic does
+/// **not** automatically unset `active_mimic` — you may want to run
+/// `/mimic delete active_mimic` afterwards or set a new active mimic.
 #[poise::command(slash_command)]
 pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: String) -> Result {
     let user_id = ctx.author().id;
@@ -42,7 +56,9 @@ pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: Stri
     Ok(())
 }
 
-/// /mimic delete channel_override: delete a channel_override if set.
+/// Remove the mimic override for a specific channel.
+///
+/// After this, messages in that channel will use your active mimic instead.
 #[poise::command(slash_command)]
 pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
     let user_id = ctx.author().id;
@@ -71,7 +87,11 @@ pub async fn channel_override(ctx: Context<'_>, channel: Channel) -> Result {
     Ok(())
 }
 
-/// /mimic delete active_mimic: unsets your active_mimic, ignoring channel_override settings.
+/// Unset your active mimic.
+///
+/// Fails if auto-mode is currently enabled, because disabling the active
+/// mimic with auto-mode on would leave the bot in an inconsistent state.
+/// Disable auto-mode first (`/mimic set auto Disable`) before running this.
 #[poise::command(slash_command)]
 pub async fn active_mimic(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;

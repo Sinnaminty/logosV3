@@ -1,3 +1,21 @@
+//! The central shared-state type injected into every command invocation.
+//!
+//! [`Data`] is the Poise "user data" object. It lives for the lifetime of the
+//! bot and is accessed through [`crate::pawthos::types::Context::data()`].
+//!
+//! # Database access pattern
+//!
+//! All reads and writes go through the [`def_db_access!`] macro-generated
+//! methods (`with_*_user_read` / `with_*_user_write`). These methods:
+//!
+//! 1. Acquire the appropriate `RwLock` guard.
+//! 2. Look up (or create) the user's record.
+//! 3. Call the user-supplied closure with a reference to the sub-struct.
+//! 4. On writes, clone the entire DB and send the snapshot to the persistence
+//!    task via [`persistent_data_channel`] — without blocking the caller.
+//!
+//! [`persistent_data_channel`]: Data::persistent_data_channel
+
 use crate::pawthos::enums::mimic_errors::MimicError;
 use crate::pawthos::enums::persistent_data::{PersistentData, UserDailyClaimed};
 use crate::pawthos::enums::schedule_errors::ScheduleError;
@@ -12,16 +30,55 @@ use chrono::{Duration, Local, NaiveTime};
 use poise::serenity_prelude::UserId;
 use tokio::sync::RwLock;
 
-/// User data, which is stored and accessible in all command invocations
+/// Shared bot state; one instance lives for the lifetime of the process.
+///
+/// Constructed in [`crate::framework::setup_framework`] and injected into
+/// every command via the Poise framework. Cloned handles (channels) let
+/// commands communicate with background tasks without holding locks.
 #[derive(Debug)]
 pub struct Data {
+    /// The in-memory user database, protected by an async read-write lock.
+    ///
+    /// Multiple commands can read concurrently; writes are exclusive.
     pub user_db: RwLock<UserDB>,
+
+    /// Sender half of the persistence channel.
+    ///
+    /// Every successful DB write sends a [`PersistentData::UserDB`] snapshot
+    /// here so the background persistence task can flush it to disk
+    /// asynchronously. Daily-check requests are also routed through this
+    /// channel.
     pub persistent_data_channel: tokio::sync::mpsc::Sender<PersistentData>,
+
+    /// Sender half of the schedule-reminder channel.
+    ///
+    /// Sending `(UserId, ScheduleEvent)` here causes the background scheduler
+    /// to spawn a task that sleeps until the event time and then DMs the user.
     pub schedule_events_channel: tokio::sync::mpsc::UnboundedSender<(UserId, ScheduleEvent)>,
 }
 
+/// Generates a matching read/write method pair for one feature's user sub-struct.
+///
+/// # Parameters
+/// - `$read_fn`  — name of the generated read method (e.g. `with_mimic_user_read`)
+/// - `$write_fn` — name of the generated write method (e.g. `with_mimic_user_write`)
+/// - `$marker`   — the [`UserDbSpec`] marker type (e.g. `MimicDbMarker`)
+/// - `$user_type`— the concrete user sub-struct (e.g. `MimicUser`)
+/// - `$err`      — the error type returned by the closure (e.g. `MimicError`)
+/// - `$no_user`  — the error variant to return when the user has no DB entry
+///
+/// # Adding a new feature
+/// Add one line inside `impl Data`:
+/// ```ignore
+/// def_db_access!(with_foo_user_read, with_foo_user_write, FooDbMarker, FooUser, FooError, FooError::NoUserFound);
+/// ```
 macro_rules! def_db_access {
     ($read_fn:ident, $write_fn:ident, $marker:ty, $user_type:ty, $err:ty, $no_user:expr) => {
+        /// Read the calling user's sub-struct without modifying it.
+        ///
+        /// Returns `Err($no_user)` if the user has no entry in the database.
+        /// The closure receives an immutable reference and must return
+        /// `Result<R, $err>`.
         pub async fn $read_fn<R, F>(&self, user_id: UserId, f: F) -> Result<R, $err>
         where
             F: for<'a> FnOnce(&'a $user_type) -> Result<R, $err>,
@@ -33,6 +90,12 @@ macro_rules! def_db_access {
             .await
         }
 
+        /// Mutably access the calling user's sub-struct.
+        ///
+        /// Creates a default entry if the user is new. After the closure
+        /// returns, the entire database is snapshotted and queued for
+        /// persistence automatically — the caller does not need to do anything
+        /// extra to trigger a save.
         pub async fn $write_fn<R, F>(&self, user_id: UserId, f: F) -> Result<R, $err>
         where
             F: for<'a> FnOnce(&'a mut $user_type) -> Result<R, $err>,
@@ -44,7 +107,10 @@ macro_rules! def_db_access {
 }
 
 impl Data {
-    //private
+    /// Acquire a read lock and pass `Option<&User>` to a closure.
+    ///
+    /// Private — public callers should use the macro-generated `with_*_user_read`
+    /// methods which handle the "user not found" case ergonomically.
     async fn with_db_user_read<DbMarker, R, F>(&self, user_id: UserId, f: F) -> R
     where
         DbMarker: UserDbSpec,
@@ -56,6 +122,11 @@ impl Data {
         f(maybe_user)
     }
 
+    /// Acquire a write lock, call the closure, then snapshot and queue the DB.
+    ///
+    /// Private — public callers should use the macro-generated `with_*_user_write`
+    /// methods. The snapshot is sent on `persistent_data_channel`; failures are
+    /// logged but not propagated to the caller.
     async fn with_db_user_write<DbMarker, R, F>(&self, user_id: UserId, f: F) -> R
     where
         DbMarker: UserDbSpec,
@@ -82,6 +153,7 @@ impl Data {
     //
     // public interfaces :3c
     //
+
     def_db_access!(
         with_mimic_user_read,
         with_mimic_user_write,
@@ -107,6 +179,18 @@ impl Data {
         WalletError::NoUserFound
     );
 
+    /// Attempt to grant the daily tab reward to a user.
+    ///
+    /// This method coordinates with the persistence task (via a request/response
+    /// one-shot channel) to atomically check-and-mark the daily claim. The
+    /// wallet list is intentionally serialised through the single-threaded
+    /// persistence loop to avoid race conditions between concurrent `/daily`
+    /// invocations.
+    ///
+    /// Returns the user's new tab balance on success, or one of:
+    /// - [`WalletError::DailyOnCooldown`] — already claimed today, includes
+    ///   remaining seconds until midnight.
+    /// - [`WalletError::RecvError`] — the persistence channel dropped (fatal).
     pub async fn wallet_user_daily(&self, user_id: UserId) -> Result<i64, WalletError> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 

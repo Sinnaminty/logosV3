@@ -1,3 +1,20 @@
+//! `/mimic` command suite — webhook-based persona impersonation.
+//!
+//! The mimic feature lets users create named personas (a display name and
+//! optional avatar URL). When a mimic is active and the user sends a message,
+//! the bot re-posts it via a Discord webhook so it appears to come from a
+//! different identity.
+//!
+//! # Sub-modules
+//! - [`set`] — subcommands for configuring mimic settings.
+//! - [`delete`] — subcommands for removing mimics and overrides.
+//!
+//! # Commands in this file
+//! - [`mimic`] — parent command (required by Poise).
+//! - [`add`] — create a new mimic persona.
+//! - [`list`] — display all of the user's mimics.
+//! - [`say`] — post a one-off message as the active mimic.
+
 use crate::commands::mimic::{delete::*, set::*};
 use crate::pawthos::{
     structs::mimic::Mimic,
@@ -9,7 +26,14 @@ use serenity::{AutocompleteChoice, ExecuteWebhook};
 mod delete;
 mod set;
 
-/// Returns AutocompleteChoices to the Mimic slash commands that request Mimic Autocompletes.
+// ---------------------------------------------------------------------------
+// Autocomplete helper
+// ---------------------------------------------------------------------------
+
+/// Provide autocomplete choices for commands that accept a mimic name.
+///
+/// Filters the user's mimic list by the partial string typed so far and
+/// returns up to the Discord autocomplete limit of 25 entries.
 async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
     ctx.data()
         .with_mimic_user_read(ctx.author().id, |user| {
@@ -27,14 +51,21 @@ async fn fetch_mimics(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice
         .unwrap_or_default()
 }
 
-/// /mimic: Mimic suite of commands.
+// ---------------------------------------------------------------------------
+// Commands
+// ---------------------------------------------------------------------------
+
+/// Mimic suite of commands — create personas and talk as them via webhook.
 #[poise::command(slash_command, subcommands("add", "list", "delete", "set", "say"))]
 pub async fn mimic(_ctx: Context<'_>) -> Result {
     Ok(())
 }
 
-/// /mimic add: Create a mimic from an avatar + a name.
-// non-fallible func
+/// Create a new mimic persona from a name and an optional avatar.
+///
+/// The new mimic is immediately set as your active mimic. You can provide the
+/// avatar as a URL, a file attachment, or neither (the webhook uses its own
+/// default avatar). Attachment takes priority over URL if both are supplied.
 #[poise::command(slash_command)]
 pub async fn add(
     ctx: Context<'_>,
@@ -69,7 +100,10 @@ pub async fn add(
     Ok(())
 }
 
-/// /mimic list: Shows a list of all mimics.
+/// List all of your mimics, showing each one's name and avatar.
+///
+/// Each mimic appears as its own embed. The first embed is a header; avatars
+/// are shown as embed images where available.
 #[poise::command(slash_command)]
 pub async fn list(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
@@ -97,7 +131,10 @@ pub async fn list(ctx: Context<'_>) -> Result {
     Ok(())
 }
 
-/// /mimic say: Speak as your active mimic in this channel
+/// Post a single message in this channel as your active mimic (or channel override).
+///
+/// The confirmation reply ("sent~") is sent ephemerally and then immediately
+/// deleted so only the webhook message is visible.
 #[poise::command(slash_command)]
 pub async fn say(
     ctx: Context<'_>,

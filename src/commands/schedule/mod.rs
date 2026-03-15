@@ -1,3 +1,16 @@
+//! `/schedule` command suite — timezone-aware event reminders.
+//!
+//! Users can add named events with a date, time, and their configured timezone.
+//! The bot stores events in UTC and sends the user a DM when the event time
+//! arrives (via [`crate::framework`]'s reminder task).
+//!
+//! # Commands
+//! - [`schedule`] — parent command.
+//! - [`add`] — add an event (date + time + current timezone).
+//! - [`list`] — list upcoming events (prunes past ones first).
+//! - [`delete`] — remove an event by name.
+//! - [`set_tz`] — set your home timezone (used when parsing event times).
+
 use std::str::FromStr;
 
 use crate::pawthos::enums::schedule_errors::ScheduleError;
@@ -8,7 +21,13 @@ use chrono_tz::{TZ_VARIANTS, Tz};
 use poise::serenity_prelude::{self as serenity};
 use serenity::AutocompleteChoice;
 
-/// Returns AutocompleteChoices to the Schedule slash commands that request Event Autocompletes.
+// ---------------------------------------------------------------------------
+// Autocomplete helper
+// ---------------------------------------------------------------------------
+
+/// Provide autocomplete choices for commands that accept an event name.
+///
+/// Filters the user's event list by the partial string typed so far.
 async fn fetch_events(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
     ctx.data()
         .with_schedule_user_read(ctx.author().id, |user| {
@@ -25,13 +44,25 @@ async fn fetch_events(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice
         .await
         .unwrap_or_default()
 }
-/// /schedule: Schedule suite of commands.
+
+// ---------------------------------------------------------------------------
+// Commands
+// ---------------------------------------------------------------------------
+
+/// Schedule suite of commands for timezone-aware event reminders.
 #[poise::command(slash_command, subcommands("add", "list", "delete", "set_tz"))]
 pub async fn schedule(_ctx: Context<'_>) -> Result {
     Ok(())
 }
 
-/// /schedule add: Adds an event to your schedule.
+/// Add an event to your schedule and receive a DM reminder when it arrives.
+///
+/// Times are interpreted in your configured timezone (set with `/schedule set_tz`).
+/// The event is stored in UTC internally. The bot will DM you at the event time
+/// with a reminder — this persists across bot restarts.
+///
+/// Returns an error if the date/time string is malformed, the timezone is
+/// invalid, or the time falls in a DST gap.
 #[poise::command(slash_command)]
 pub async fn add(
     ctx: Context<'_>,
@@ -81,7 +112,10 @@ pub async fn add(
     Ok(())
 }
 
-/// /schedule list: Lists all your events.
+/// List all of your upcoming events, sorted by time.
+///
+/// Past events are pruned from your list before displaying (and the pruned
+/// list is saved). Each event is shown as `"<name> : <local datetime>"`.
 #[poise::command(slash_command)]
 pub async fn list(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
@@ -98,7 +132,9 @@ pub async fn list(ctx: Context<'_>) -> Result {
     Ok(())
 }
 
-/// /schedule delete: Deletes a selected event.
+/// Delete an event from your schedule by name.
+///
+/// Autocomplete lists your current upcoming events.
 #[poise::command(slash_command)]
 pub async fn delete(
     ctx: Context<'_>,
@@ -120,6 +156,10 @@ pub async fn delete(
     Ok(())
 }
 
+/// Provide autocomplete choices for timezone names.
+///
+/// Matches all IANA timezone strings (from `chrono_tz`) that contain the
+/// partial input as a case-insensitive substring.
 async fn fetch_timezones(_ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
     let partial = &partial.to_lowercase();
 
@@ -133,7 +173,13 @@ async fn fetch_timezones(_ctx: Context<'_>, partial: &str) -> Vec<AutocompleteCh
         })
         .collect()
 }
-/// /schedule set_tz: Set the timezone you're located in.
+
+/// Set your home timezone so event times are interpreted correctly.
+///
+/// Accepts any IANA timezone name (e.g. `America/New_York`, `Europe/London`).
+/// Autocomplete searches all available timezones. Your existing events are
+/// **not** adjusted — they remain stored in UTC and will display in the new
+/// timezone when you next run `/schedule list`.
 #[poise::command(slash_command)]
 pub async fn set_tz(
     ctx: Context<'_>,

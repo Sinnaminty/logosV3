@@ -1,3 +1,9 @@
+//! Entry point for logosV3.
+//!
+//! Parses CLI arguments, initialises logging, builds the Poise/Serenity client,
+//! and starts the bot. The only startup I/O this module performs is reading the
+//! log-level flag; everything else is delegated to [`setup`].
+
 use clap::Parser;
 use log::LevelFilter;
 use poise::serenity_prelude as serenity;
@@ -11,7 +17,10 @@ mod pawthos;
 mod setup;
 mod utils;
 
-/// V3 of the same bot. I need a job...
+/// Command-line arguments for logosV3.
+///
+/// Pass `--log-level debug` (or `-l debug`) for verbose output during
+/// development. Defaults to `info` in production.
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 pub struct Args {
