@@ -1,4 +1,4 @@
-use crate::pawthos::enums::persistant_data::PersistantData;
+use crate::pawthos::enums::persistent_data::PersistentData;
 use crate::pawthos::structs::data::Data;
 use crate::pawthos::structs::mimic_user::MimicUser;
 use crate::pawthos::structs::schedule_user::ScheduleUser;
@@ -27,8 +27,8 @@ pub trait UserDbSpec {
     /// Get a mutable per-user entry (creating a default one if needed).
     fn get_user_mut(db: &mut Self::Db, user_id: UserId) -> &mut Self::User;
 
-    /// Wrap a DB snapshot into the correct `PersistantData` variant.
-    fn to_persistant_data(db: Self::Db) -> PersistantData;
+    /// Wrap a DB snapshot into the correct `PersistentData` variant.
+    fn to_persistent_data(db: Self::Db) -> PersistentData;
 }
 
 impl UserDbSpec for MimicDbMarker {
@@ -47,8 +47,8 @@ impl UserDbSpec for MimicDbMarker {
         &mut db.get_user_mut(user_id).mimic
     }
 
-    fn to_persistant_data(db: Self::Db) -> PersistantData {
-        PersistantData::UserDB(db)
+    fn to_persistent_data(db: Self::Db) -> PersistentData {
+        PersistentData::UserDB(db)
     }
 }
 
@@ -68,8 +68,8 @@ impl UserDbSpec for ScheduleDbMarker {
         &mut db.get_user_mut(user_id).schedule
     }
 
-    fn to_persistant_data(db: Self::Db) -> PersistantData {
-        PersistantData::UserDB(db)
+    fn to_persistent_data(db: Self::Db) -> PersistentData {
+        PersistentData::UserDB(db)
     }
 }
 
@@ -90,7 +90,7 @@ impl UserDbSpec for WalletDbMarker {
         &mut db.get_user_mut(user_id).wallet
     }
 
-    fn to_persistant_data(db: Self::Db) -> PersistantData {
-        PersistantData::UserDB(db)
+    fn to_persistent_data(db: Self::Db) -> PersistentData {
+        PersistentData::UserDB(db)
     }
 }

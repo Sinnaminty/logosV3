@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use crate::pawthos::enums::embed_type::EmbedType;
+use crate::pawthos::enums::schedule_errors::ScheduleError;
 use crate::pawthos::types::{Context, Reply, Result};
 use crate::utils;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
@@ -51,12 +52,14 @@ pub async fn add(
         .await?;
 
     // this is the local date time :3c
-    // FIXME: is this unwrap dangerous?
-    let local_dt = naive_dt.and_local_timezone(local_tz).unwrap();
+    let local_dt = naive_dt
+        .and_local_timezone(local_tz)
+        .single()
+        .ok_or(ScheduleError::AmbiguousOrInvalidTime)?;
 
     let embed = utils::create_embed_builder(
         "Schedule Add",
-        format!("Event{} @ {} Added to your schedule!", name, local_dt),
+        format!("Event {} @ {} Added to your schedule!", name, local_dt),
         EmbedType::Good,
     );
 
@@ -142,12 +145,12 @@ async fn fetch_timezones(_ctx: Context<'_>, partial: &str) -> Vec<AutocompleteCh
 #[poise::command(slash_command)]
 pub async fn set_tz(
     ctx: Context<'_>,
-    #[description = "Event that you want to delete."]
+    #[description = "Timezone you want to set."]
     #[autocomplete = "fetch_timezones"]
     timezone: String,
 ) -> Result {
     let user_id = ctx.author().id;
-    let tz = Tz::from_str(&timezone).unwrap();
+    let tz = Tz::from_str(&timezone).map_err(|e| ScheduleError::InvalidTimezone(e.to_string()))?;
     ctx.data()
         .with_schedule_user_write(user_id, |user| {
             user.set_timezone(tz);

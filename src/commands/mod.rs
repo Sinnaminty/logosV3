@@ -16,6 +16,7 @@ mod vox;
 
 pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
     vec![
+        help(),
         daily(),
         balance(),
         pfp(),
@@ -151,7 +152,7 @@ pub async fn preview(
 }
 
 /// sets your role and role color to your choice. Costs 10 tabs to do so.
-#[poise::command(slash_command)]
+#[poise::command(slash_command, guild_only)]
 pub async fn set(
     ctx: Context<'_>,
     #[description = "Name of your role."] name: String,
@@ -176,11 +177,7 @@ pub async fn set(
         poise::serenity_prelude::Colour::new(color_integer)
     };
 
-    let tabs = ctx
-        .data()
-        .with_wallet_user_write(user_id, |user| user.remove_tabs(COST))
-        .await?;
-
+    // Do all guild API work first — only charge tabs on success.
     let member = guild_id.member(ctx.http(), user_id).await?;
     let member_role_ids = member.roles.clone();
     let guild_roles = guild_id.roles(ctx.http()).await?;
@@ -208,6 +205,11 @@ pub async fn set(
 
         member.add_role(ctx.http(), r.id).await?;
     }
+
+    let tabs = ctx
+        .data()
+        .with_wallet_user_write(user_id, |user| user.remove_tabs(COST))
+        .await?;
 
     ctx.send(Reply::default().embed(utils::create_embed_builder(
         "Set Color",

@@ -1,8 +1,7 @@
 use crate::commands;
 use crate::handlers;
-use crate::pawthos::enums::persistant_data::PersistantData;
-use crate::pawthos::enums::persistant_data::UserDailyClaimed;
-use crate::pawthos::enums::wallet_errors;
+use crate::pawthos::enums::persistent_data::PersistentData;
+use crate::pawthos::enums::persistent_data::UserDailyClaimed;
 use crate::pawthos::structs::data::Data;
 use crate::pawthos::structs::schedule_event::ScheduleEvent;
 use crate::pawthos::structs::user_db::UserDB;
@@ -17,7 +16,8 @@ const BUFFER_SIZE: usize = 8;
 
 fn save_user_db(db: UserDB) -> Result {
     let db_json = poise::serenity_prelude::json::to_string(&db)?;
-    std::fs::write("user.json", db_json)?;
+    std::fs::write("user.json.tmp", &db_json)?;
+    std::fs::rename("user.json.tmp", "user.json")?;
     log::debug!("user.json saved :3c");
     Ok(())
 }
@@ -29,7 +29,10 @@ fn load_user_db() -> UserDB {
             log::info!("user.json found, importing db..");
             db
         }
-        Ok(Err(e)) => panic!("file is there but.. serializtion failed? {e}"), //* serializaiton failed!
+        Ok(Err(e)) => {
+            log::error!("user.json exists but deserialization failed: {e}. Starting with empty DB.");
+            Default::default()
+        }
         Err(_) => {
             log::warn!("user.json NOT found, making new db..");
             Default::default()
@@ -45,8 +48,10 @@ struct WalletList {
 
 fn save_wallet_list(wallet_list: WalletList) -> Result {
     const FILE_PATH: &str = "wallet_list.json";
-    let wallet_list = poise::serenity_prelude::json::to_string(&wallet_list)?;
-    std::fs::write(FILE_PATH, wallet_list)?;
+    let wallet_list_json = poise::serenity_prelude::json::to_string(&wallet_list)?;
+    let tmp_path = format!("{FILE_PATH}.tmp");
+    std::fs::write(&tmp_path, &wallet_list_json)?;
+    std::fs::rename(&tmp_path, FILE_PATH)?;
     log::debug!("{} saved :3c", FILE_PATH);
     Ok(())
 }
@@ -61,7 +66,10 @@ fn load_wallet_list() -> Result<WalletList, Error> {
             log::info!("{} found, importing..", FILE_PATH);
             Ok(db)
         }
-        Ok(Err(e)) => panic!("file is there but.. serializtion failed? {e}"), //* serializaiton failed!
+        Ok(Err(e)) => {
+            log::error!("{FILE_PATH} exists but deserialization failed: {e}. Starting fresh.");
+            Ok(Default::default())
+        }
         Err(_) => {
             log::warn!("{} NOT found, making new..", FILE_PATH);
             Ok(Default::default())
@@ -100,12 +108,12 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
         while let Some(update) = recv.recv().await {
             log::debug!("update received! type: {:?}", update);
             match update {
-                PersistantData::UserDB(user_db_snapshot) => {
+                PersistentData::UserDB(user_db_snapshot) => {
                     if let Err(e) = save_user_db(user_db_snapshot) {
                         log::error!("Failed to save UserDB: {:?}", e);
                     }
                 }
-                PersistantData::DailyCheck { user_id, sender } => {
+                PersistentData::DailyCheck { user_id, sender } => {
                     let user_daily_claimed_status = match daily_check(user_id) {
                         Ok(user_daily_claimed) => user_daily_claimed,
                         Err(e) => {
@@ -172,14 +180,16 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
 
             let send2 = send_tasks.clone();
             user_db.get_events().into_iter().for_each(|pair| {
-                send2.send(pair).unwrap();
+                if let Err(e) = send2.send(pair) {
+                    log::error!("Failed to queue startup reminder event: {e}");
+                }
             });
 
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(Data {
                     user_db: RwLock::new(user_db),
-                    persistant_data_channel: send,
+                    persistent_data_channel: send,
                     schedule_events_channel: send_tasks,
                 })
             })

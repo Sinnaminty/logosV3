@@ -1,5 +1,5 @@
 use crate::pawthos::enums::mimic_errors::MimicError;
-use crate::pawthos::enums::persistant_data::{PersistantData, UserDailyClaimed};
+use crate::pawthos::enums::persistent_data::{PersistentData, UserDailyClaimed};
 use crate::pawthos::enums::schedule_errors::ScheduleError;
 use crate::pawthos::enums::wallet_errors::WalletError;
 use crate::pawthos::structs::mimic_user::MimicUser;
@@ -16,7 +16,7 @@ use tokio::sync::RwLock;
 #[derive(Debug)]
 pub struct Data {
     pub user_db: RwLock<UserDB>,
-    pub persistant_data_channel: tokio::sync::mpsc::Sender<PersistantData>,
+    pub persistent_data_channel: tokio::sync::mpsc::Sender<PersistentData>,
     pub schedule_events_channel: tokio::sync::mpsc::UnboundedSender<(UserId, ScheduleEvent)>,
 }
 
@@ -47,8 +47,8 @@ impl Data {
         let snapshot = db_guard.clone();
         drop(db_guard);
         if let Err(e) = self
-            .persistant_data_channel
-            .send(DbMarker::to_persistant_data(snapshot))
+            .persistent_data_channel
+            .send(DbMarker::to_persistent_data(snapshot))
             .await
         {
             log::error!("Failed to queue DB save: {:?}", e);
@@ -136,13 +136,13 @@ impl Data {
     pub async fn wallet_user_daily(&self, user_id: UserId) -> Result<i64, WalletError> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 
-        self.persistant_data_channel
-            .send(PersistantData::DailyCheck {
+        self.persistent_data_channel
+            .send(PersistentData::DailyCheck {
                 user_id: user_id.into(),
                 sender: tx,
             })
             .await
-            .expect("Persistant Data Channel should be open.");
+            .map_err(|_| WalletError::RecvError)?;
 
         let Ok(daily_claimed) = rx.await else {
             log::error!("recv error in DailyCheck!!");

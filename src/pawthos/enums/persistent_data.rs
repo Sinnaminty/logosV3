@@ -1,7 +1,7 @@
 use crate::pawthos::structs::user_db::UserDB;
 
 #[derive(Debug)]
-pub enum PersistantData {
+pub enum PersistentData {
     UserDB(UserDB),
     DailyCheck {
         user_id: u64,

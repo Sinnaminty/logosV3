@@ -16,7 +16,7 @@ pub enum PawthosErrors {
     TokioSend(
         #[from]
         tokio::sync::mpsc::error::SendError<
-            crate::pawthos::enums::persistant_data::PersistantData,
+            crate::pawthos::enums::persistent_data::PersistentData,
         >,
     ),
 

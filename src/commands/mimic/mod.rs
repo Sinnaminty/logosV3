@@ -50,9 +50,7 @@ pub async fn add(
     let att_url = attachment.as_ref().map(|a| a.url.clone());
     let avatar_url = att_url.or(avatar_url);
 
-    // no error here...
-    let _ = ctx
-        .data()
+    ctx.data()
         .with_mimic_user_write(user_id, |user| {
             let m = Mimic {
                 name: name.clone(),
@@ -62,7 +60,7 @@ pub async fn add(
             user.active_mimic = Some(m);
             Ok(())
         })
-        .await;
+        .await?;
 
     let embed = utils::create_embed_builder(
         "Mimic Add",

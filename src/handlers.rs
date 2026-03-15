@@ -116,14 +116,14 @@ pub fn event_handler<'a>(
                 if let Some(s) = selected_mimic.avatar_url {
                     builder = builder.avatar_url(s);
                 }
-                //we also want to raise the following errors to the user.
-                if let Err(e) = new_message.delete(&ctx.http).await {
-                    log::warn!("Failed to delete original message: {e}");
+                // Execute webhook first — if it fails, original message is preserved.
+                if let Err(e) = webhook.execute(&ctx.http, false, builder).await {
+                    log::warn!("Webhook execute failed: {e}");
                     return Err(e.into());
                 }
 
-                if let Err(e) = webhook.execute(&ctx.http, false, builder).await {
-                    log::warn!("Webhook execute failed: {e}");
+                if let Err(e) = new_message.delete(&ctx.http).await {
+                    log::warn!("Failed to delete original message: {e}");
                     return Err(e.into());
                 };
                 Ok(())
