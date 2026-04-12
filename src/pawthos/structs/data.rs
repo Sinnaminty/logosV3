@@ -26,7 +26,7 @@ use crate::pawthos::structs::profile_user::ProfileUser;
 use crate::pawthos::structs::schedule_event::ScheduleEvent;
 use crate::pawthos::structs::schedule_user::ScheduleUser;
 use crate::pawthos::structs::user_db::UserDB;
-use crate::pawthos::structs::wallet_user::WalletUser;
+use crate::pawthos::structs::wallet_user::{DailyClaimResult, WalletUser};
 use crate::pawthos::traits::{
     MimicDbMarker, ProfileDbMarker, ScheduleDbMarker, UserDbSpec, WalletDbMarker,
 };
@@ -203,7 +203,7 @@ impl Data {
     /// - [`WalletError::DailyOnCooldown`] — already claimed today, includes
     ///   remaining seconds until midnight.
     /// - [`WalletError::RecvError`] — the persistence channel dropped (fatal).
-    pub async fn wallet_user_daily(&self, user_id: UserId) -> Result<i64, WalletError> {
+    pub async fn wallet_user_daily(&self, user_id: UserId) -> Result<DailyClaimResult, WalletError> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.persistent_data_channel
@@ -236,5 +236,21 @@ impl Data {
             self.with_wallet_user_write(user_id, |user| Ok(user.claim_daily()))
                 .await
         }
+    }
+
+    /// Return the top `limit` users sorted by tab balance (descending).
+    ///
+    /// Each entry is `(UserId, tabs, current_streak)`. Acquires a read lock
+    /// on the full user database.
+    pub async fn get_tab_leaderboard(&self, limit: usize) -> Vec<(UserId, i64, u32)> {
+        let db = self.user_db.read().await;
+        let mut entries: Vec<_> = db
+            .db
+            .iter()
+            .map(|(id, user)| (*id, user.wallet.tabs, user.wallet.current_streak))
+            .collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.truncate(limit);
+        entries
     }
 }

@@ -12,7 +12,9 @@
 //! - [`vox`] — DECtalk text-to-speech synthesis.
 
 use crate::commands::{mimic::*, profile::*, schedule::*, vox::*};
-use crate::pawthos::consts::{COLOR_PREVIEW_SIZE, COLOR_ROLE_COST, DAILY_REWARD, FIZZ_ID, TAB_EMOJI};
+use crate::pawthos::consts::{
+    COLOR_PREVIEW_SIZE, COLOR_ROLE_COST, DAILY_REWARD, FIZZ_ID, LEADERBOARD_SIZE, TAB_EMOJI,
+};
 use crate::pawthos::enums::color_errors::ColorError;
 use crate::pawthos::{
     enums::embed_type::EmbedType,
@@ -45,6 +47,7 @@ pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
         schedule(),
         color(),
         profile(),
+        leaderboard(),
         fix_color_role_names(),
     ]
 }
@@ -90,22 +93,39 @@ pub async fn pfp(
     Ok(())
 }
 
-/// Claim your daily tab reward (10 tabs, once every 24 hours).
+/// Claim your daily tab reward with streak bonus.
 ///
 /// The response is ephemeral so only you can see it. The daily window resets
 /// at midnight local time; the cooldown message tells you exactly how long
-/// remains if you've already claimed.
+/// remains if you've already claimed. Consecutive daily claims build a streak
+/// that awards bonus tabs (up to +5).
 #[poise::command(slash_command)]
 pub async fn daily(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
 
-    let balance = ctx.data().wallet_user_daily(user_id).await?;
+    let result = ctx.data().wallet_user_daily(user_id).await?;
+
+    let streak_msg = if result.current_streak > 1 {
+        format!(" You're on a **{}-day streak**!", result.current_streak)
+    } else {
+        String::new()
+    };
+
+    let bonus_msg = if result.reward > DAILY_REWARD {
+        format!(" ({}+{} streak bonus)", DAILY_REWARD, result.reward - DAILY_REWARD)
+    } else {
+        String::new()
+    };
 
     ctx.send(
-                poise::CreateReply::default()
-                    .content(format!("✅ You claimed **{DAILY_REWARD} {TAB_EMOJI}**! You now have **{balance} {TAB_EMOJI}**.",),)
-                    .ephemeral(true),
-            ).await?;
+        poise::CreateReply::default()
+            .content(format!(
+                "✅ You claimed **{} {TAB_EMOJI}**{bonus_msg}! You now have **{} {TAB_EMOJI}**.{streak_msg}",
+                result.reward, result.balance,
+            ))
+            .ephemeral(true),
+    )
+    .await?;
     Ok(())
 }
 
@@ -127,6 +147,54 @@ pub async fn balance(ctx: Context<'_>) -> Result {
     )
     .await?;
 
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Leaderboard
+// ---------------------------------------------------------------------------
+
+/// Show the top tab holders in the server.
+///
+/// Displays the top 10 users ranked by tab balance, with their current daily
+/// streak shown alongside if active.
+#[poise::command(slash_command)]
+pub async fn leaderboard(ctx: Context<'_>) -> Result {
+    let entries = ctx.data().get_tab_leaderboard(LEADERBOARD_SIZE).await;
+
+    if entries.is_empty() {
+        ctx.send(utils::reply_info(
+            "Tab Leaderboard",
+            "No one has any tabs yet! Use `/daily` to get started.",
+        ))
+        .await?;
+        return Ok(());
+    }
+
+    let mut description = String::new();
+    for (rank, (user_id, tabs, streak)) in entries.iter().enumerate() {
+        let medal = match rank {
+            0 => "🥇",
+            1 => "🥈",
+            2 => "🥉",
+            _ => "▫️",
+        };
+
+        let streak_text = if *streak > 1 {
+            format!(" (🔥 {streak}-day streak)")
+        } else {
+            String::new()
+        };
+
+        description.push_str(&format!(
+            "{medal} <@{user_id}> — **{tabs}** {TAB_EMOJI}{streak_text}\n"
+        ));
+    }
+
+    let embed = utils::create_embed_builder("Tab Leaderboard", description, EmbedType::Neutral);
+
+    ctx.send(poise::CreateReply::default().embed(embed))
+        .await?;
     Ok(())
 }
 

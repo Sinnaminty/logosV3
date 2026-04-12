@@ -1,9 +1,24 @@
 //! Per-user state for the wallet/tab economy.
 
+use chrono::{Local, NaiveDate};
 use poise::serenity_prelude::Role;
 use serde::{Deserialize, Serialize};
 
-use crate::pawthos::{consts::DAILY_REWARD, enums::wallet_errors::WalletError};
+use crate::pawthos::consts::{DAILY_REWARD, MAX_STREAK_BONUS};
+use crate::pawthos::enums::wallet_errors::WalletError;
+
+/// The result of a successful `/daily` claim.
+///
+/// Returned by [`WalletUser::claim_daily`] so the command handler can display
+/// streak progress alongside the reward.
+pub struct DailyClaimResult {
+    /// The user's new tab balance after the reward was added.
+    pub balance: i64,
+    /// How many tabs were awarded this time (base + streak bonus).
+    pub reward: i64,
+    /// The user's current consecutive-day streak after this claim.
+    pub current_streak: u32,
+}
 
 /// All wallet-related state for a single user.
 ///
@@ -25,6 +40,16 @@ pub struct WalletUser {
     /// reconciliation logic).
     #[serde(default)]
     pub owned_roles: Vec<Role>,
+
+    /// How many consecutive days the user has claimed `/daily` without missing
+    /// a day. Resets to 0 on a missed day.
+    #[serde(default)]
+    pub current_streak: u32,
+
+    /// The date of the user's most recent `/daily` claim (local time).
+    /// `None` if they have never claimed.
+    #[serde(default)]
+    pub last_claim_date: Option<NaiveDate>,
 }
 
 impl WalletUser {
@@ -50,10 +75,34 @@ impl WalletUser {
         }
     }
 
-    /// Grant the daily reward ([`DAILY_REWARD`] tabs) and return the new
-    /// balance. Should only be called after confirming the user hasn't already
-    /// claimed today (see [`crate::pawthos::structs::data::Data::wallet_user_daily`]).
-    pub fn claim_daily(&mut self) -> i64 {
-        self.add_tabs(DAILY_REWARD)
+    /// Grant the daily reward with streak tracking.
+    ///
+    /// - If the user claimed yesterday, the streak increments.
+    /// - Otherwise the streak resets to 1.
+    /// - Bonus tabs scale with the streak up to [`MAX_STREAK_BONUS`].
+    ///
+    /// Should only be called after confirming the user hasn't already claimed
+    /// today (see [`crate::pawthos::structs::data::Data::wallet_user_daily`]).
+    pub fn claim_daily(&mut self) -> DailyClaimResult {
+        let today = Local::now().date_naive();
+
+        self.current_streak = match self.last_claim_date {
+            Some(last) if last == today - chrono::Duration::days(1) => {
+                self.current_streak.saturating_add(1)
+            }
+            _ => 1,
+        };
+
+        self.last_claim_date = Some(today);
+
+        let bonus = (self.current_streak as i64 - 1).min(MAX_STREAK_BONUS);
+        let reward = DAILY_REWARD + bonus;
+        self.tabs += reward;
+
+        DailyClaimResult {
+            balance: self.tabs,
+            reward,
+            current_streak: self.current_streak,
+        }
     }
 }
