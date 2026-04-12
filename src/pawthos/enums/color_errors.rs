@@ -1,21 +1,17 @@
-#[derive(Debug)]
+//! Error type for colour parsing and image generation.
 
+/// Errors that can occur in the `/color` command group.
+#[derive(thiserror::Error, Debug)]
 pub enum ColorError {
+    /// The supplied colour string was not valid hexadecimal.
+    ///
+    /// Valid inputs are bare hex (`FF8800`) or `0x`-prefixed (`0xFF8800`).
+    #[error("Color has incorrect format!")]
     IncorrectFormat,
+
+    /// The [`image`] crate failed while encoding the preview PNG.
+    ///
+    /// Wraps the underlying [`image::ImageError`] for display.
+    #[error("ImageError!: {0}")]
     ImageError(image::ImageError),
 }
-
-impl std::fmt::Display for ColorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ColorError::IncorrectFormat => {
-                write!(f, "Color has incorrect format!")
-            }
-            ColorError::ImageError(e) => {
-                write!(f, "ImageError!: {e}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ColorError {}

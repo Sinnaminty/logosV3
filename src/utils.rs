@@ -1,13 +1,25 @@
+//! Shared utility functions and traits.
+//!
+//! Contains the [`ResultExt`] helper trait, the standard embed builder, the
+//! three high-level reply helpers ([`reply_ok`], [`reply_err`], [`reply_info`]),
+//! and the webhook fetch-or-create helper used by the mimic feature.
+
 use crate::pawthos::enums::embed_type::EmbedType;
-use crate::pawthos::types::Embed;
-use crate::pawthos::types::Error;
+use crate::pawthos::types::{Embed, Error, Reply};
 use poise::serenity_prelude as serenity;
 use serenity::Webhook;
 use std::fmt::Display;
 
-/// this is a trait!!
+// ---------------------------------------------------------------------------
+// ResultExt
+// ---------------------------------------------------------------------------
+
+/// Extension methods on [`Result`] for unrecoverable error paths.
 pub trait ResultExt<T, E> {
-    /// Unwraps the result, logging the error and panicking if it's an Err.
+    /// Unwrap the `Ok` value, or log the error at `ERROR` level and panic.
+    ///
+    /// Use this only for truly unrecoverable situations at startup (e.g. the
+    /// Discord client failing to build). Prefer `?` everywhere else.
     fn unwrap_or_log(self, from: impl Display) -> T;
 }
 
@@ -23,6 +35,44 @@ impl<T, E: std::fmt::Display> ResultExt<T, E> for Result<T, E> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Reply helpers
+// ---------------------------------------------------------------------------
+
+/// Build a "success" reply with a green embed.
+///
+/// Shorthand for `Reply::default().embed(create_embed_builder(title, body, EmbedType::Good))`.
+pub fn reply_ok(title: impl Into<String>, body: impl Into<String>) -> Reply {
+    Reply::default().embed(create_embed_builder(title, body, EmbedType::Good))
+}
+
+/// Build an "error" reply with a red embed.
+///
+/// Shorthand for `Reply::default().embed(create_embed_builder(title, body, EmbedType::Bad))`.
+pub fn reply_err(title: impl Into<String>, body: impl Into<String>) -> Reply {
+    Reply::default().embed(create_embed_builder(title, body, EmbedType::Bad))
+}
+
+/// Build an "informational" reply with a neutral (pink) embed.
+///
+/// Shorthand for `Reply::default().embed(create_embed_builder(title, body, EmbedType::Neutral))`.
+pub fn reply_info(title: impl Into<String>, body: impl Into<String>) -> Reply {
+    Reply::default().embed(create_embed_builder(title, body, EmbedType::Neutral))
+}
+
+// ---------------------------------------------------------------------------
+// Embed builder
+// ---------------------------------------------------------------------------
+
+/// Build a standard Logos embed with consistent footer, author, and timestamp.
+///
+/// All three reply helpers delegate here; call this directly only when you
+/// need to further customise the embed (e.g. add `.image()`).
+///
+/// # Parameters
+/// - `title` — the embed title.
+/// - `description` — the embed body text.
+/// - `embed_type` — controls the accent colour (see [`EmbedType`]).
 pub fn create_embed_builder(
     title: impl Into<String>,
     description: impl Into<String>,
@@ -39,6 +89,17 @@ pub fn create_embed_builder(
         .color(embed_type.into_color())
 }
 
+// ---------------------------------------------------------------------------
+// Webhook helpers
+// ---------------------------------------------------------------------------
+
+/// Return the existing `"pawthos-mimic"` webhook for `channel_id`, or create
+/// one if none exists.
+///
+/// The mimic and auto-mode features use webhooks to post messages that appear
+/// to come from a different username/avatar. A single named webhook per
+/// channel is reused across all calls to avoid hitting Discord's webhook
+/// creation rate limits.
 pub async fn get_or_create_webhook(
     http: &serenity::Http,
     channel_id: serenity::ChannelId,

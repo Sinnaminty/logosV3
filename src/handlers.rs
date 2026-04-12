@@ -1,3 +1,16 @@
+//! Discord event and error handlers for the Poise framework.
+//!
+//! Two functions are registered with the framework:
+//!
+//! - [`error_handler`] — called when a command or event returns an `Err`.
+//!   Shows a Discord embed to the user for command errors, and auto-corrects
+//!   the "auto-mode but no active mimic" edge case.
+//!
+//! - [`event_handler`] — called for every Discord gateway event. Only
+//!   [`serenity::FullEvent::Message`] events are acted upon: if the message
+//!   author has mimic auto-mode enabled, the message is re-sent via webhook
+//!   as the active mimic persona and the original is deleted.
+
 use crate::pawthos::enums::pawthos_errors::PawthosErrors;
 use crate::pawthos::enums::{embed_type::EmbedType, mimic_errors::MimicError};
 use crate::pawthos::structs::data::Data;
@@ -9,6 +22,20 @@ use poise::serenity_prelude as serenity;
 use serenity::{ExecuteWebhook, FullEvent};
 use std::pin::Pin;
 
+/// Handle errors produced by commands or event callbacks.
+///
+/// This function is registered as `on_error` in the framework options.
+/// Poise requires a `Pin<Box<dyn Future<Output = ()> + Send + '_>>` return
+/// type because it is called from a generic async context.
+///
+/// # Behaviour by variant
+///
+/// | Error variant | Action |
+/// |---|---|
+/// | `Command { error, ctx }` | Send a red "ERROR" embed to the invoking channel |
+/// | `EventHandler { Message, NoActiveMimic }` | Disable auto-mode and notify the user |
+/// | `EventHandler { Message, other }` | Log at ERROR level |
+/// | Any other framework error | Log at ERROR level |
 pub fn error_handler(
     error: FrameworkError<'_, Data, Error>,
 ) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
@@ -30,6 +57,11 @@ pub fn error_handler(
                 framework,
                 ..
             } => match event {
+                // Special case: auto-mode is on but the user has no active mimic.
+                // This can happen if the user deleted their active mimic without
+                // first disabling auto-mode. Silently disable auto-mode and inform
+                // the user so they don't wonder why their messages stopped being
+                // intercepted.
                 FullEvent::Message { new_message } => match error {
                     PawthosErrors::Mimic(MimicError::NoActiveMimic) => {
                         let user_id = new_message.author.id;
@@ -67,6 +99,22 @@ pub fn error_handler(
     })
 }
 
+/// React to Discord gateway events.
+///
+/// Currently only handles [`FullEvent::Message`]; all other events are
+/// silently ignored (debug-logged).
+///
+/// # Auto-mode flow
+///
+/// When a message arrives from a user who has `auto_mode = true`:
+///
+/// 1. Look up the active mimic for the channel (respecting channel overrides).
+/// 2. Fetch or create the `"pawthos-mimic"` webhook for the channel.
+/// 3. Execute the webhook with the mimic's name and avatar.
+/// 4. Delete the original message.
+///
+/// If the webhook post succeeds but the delete fails, the error is returned
+/// (and logged) but the webhook post is *not* undone, to avoid double-posting.
 pub fn event_handler<'a>(
     ctx: &'a serenity::Context,
     event: &'a serenity::FullEvent,
@@ -116,14 +164,14 @@ pub fn event_handler<'a>(
                 if let Some(s) = selected_mimic.avatar_url {
                     builder = builder.avatar_url(s);
                 }
-                //we also want to raise the following errors to the user.
-                if let Err(e) = new_message.delete(&ctx.http).await {
-                    log::warn!("Failed to delete original message: {e}");
+                // Execute webhook first — if it fails, original message is preserved.
+                if let Err(e) = webhook.execute(&ctx.http, false, builder).await {
+                    log::warn!("Webhook execute failed: {e}");
                     return Err(e.into());
                 }
 
-                if let Err(e) = webhook.execute(&ctx.http, false, builder).await {
-                    log::warn!("Webhook execute failed: {e}");
+                if let Err(e) = new_message.delete(&ctx.http).await {
+                    log::warn!("Failed to delete original message: {e}");
                     return Err(e.into());
                 };
                 Ok(())

@@ -1,5 +1,18 @@
+//! Top-level command registry and miscellaneous slash/prefix commands.
+//!
+//! This module owns:
+//! - [`return_commands`] — the list of all commands registered with the framework.
+//! - Utility commands: `help`, `pfp`, `daily`, `balance`.
+//! - The `/color` command group (`preview` + `set`).
+//! - Admin prefix commands (`register`, `give_tabs`, `fix_color_role_names`).
+//!
+//! Feature-specific command groups live in their own sub-modules:
+//! - [`mimic`] — webhook-based persona impersonation.
+//! - [`schedule`] — timezone-aware event reminders.
+//! - [`vox`] — DECtalk text-to-speech synthesis.
+
 use crate::commands::{mimic::*, schedule::*, vox::*};
-use crate::pawthos::consts::{DAILY_REWARD, FIZZ_ID};
+use crate::pawthos::consts::{COLOR_PREVIEW_SIZE, COLOR_ROLE_COST, DAILY_REWARD, FIZZ_ID, TAB_EMOJI};
 use crate::pawthos::enums::color_errors::ColorError;
 use crate::pawthos::{
     enums::embed_type::EmbedType,
@@ -10,12 +23,17 @@ use crate::utils::{self};
 use image::ImageEncoder;
 use poise::serenity_prelude::{self as serenity, EditRole, RoleId, User};
 mod mimic;
-mod oot;
 mod schedule;
 mod vox;
 
+/// Register all commands with the Poise framework.
+///
+/// Slash commands are registered globally in [`crate::framework::setup_framework`].
+/// To add a new command, create it in this file (or a sub-module) and append
+/// it to the `vec!` here.
 pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
     vec![
+        help(),
         daily(),
         balance(),
         pfp(),
@@ -29,6 +47,11 @@ pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
     ]
 }
 
+// ---------------------------------------------------------------------------
+// General-purpose commands
+// ---------------------------------------------------------------------------
+
+/// Show help text for the bot or a specific command.
 #[poise::command(slash_command)]
 pub async fn help(
     ctx: Context<'_>,
@@ -46,7 +69,7 @@ pub async fn help(
 
 // TODO: add the ability to grab both global pfp and guild.
 
-/// Displays the calling users' profile picture
+/// Display a user's profile picture as a large embed image.
 #[poise::command(slash_command)]
 pub async fn pfp(
     ctx: Context<'_>,
@@ -63,7 +86,12 @@ pub async fn pfp(
     ctx.send(r).await?;
     Ok(())
 }
-/// Gives you 10 tabs. can only be used once every 24 hours.
+
+/// Claim your daily tab reward (10 tabs, once every 24 hours).
+///
+/// The response is ephemeral so only you can see it. The daily window resets
+/// at midnight local time; the cooldown message tells you exactly how long
+/// remains if you've already claimed.
 #[poise::command(slash_command)]
 pub async fn daily(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
@@ -72,13 +100,13 @@ pub async fn daily(ctx: Context<'_>) -> Result {
 
     ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("✅ You claimed **{} <:tab:1459045305084547123>**! You now have **{balance} <:tab:1459045305084547123>**.", DAILY_REWARD),)
+                    .content(format!("✅ You claimed **{DAILY_REWARD} {TAB_EMOJI}**! You now have **{balance} {TAB_EMOJI}**.",),)
                     .ephemeral(true),
             ).await?;
     Ok(())
 }
 
-/// Shows how many tabs you have in your wallet.
+/// Check your current tab balance (ephemeral — only you can see it).
 #[poise::command(slash_command)]
 pub async fn balance(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
@@ -90,7 +118,7 @@ pub async fn balance(ctx: Context<'_>) -> Result {
     ctx.send(
         poise::CreateReply::default()
             .content(format!(
-                "You have **{balance} <:tab:1459045305084547123>!**"
+                "You have **{balance} {TAB_EMOJI}!**"
             ))
             .ephemeral(true),
     )
@@ -99,12 +127,21 @@ pub async fn balance(ctx: Context<'_>) -> Result {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Color commands
+// ---------------------------------------------------------------------------
+
+/// Colour-related commands: preview a hex colour, or purchase a custom role.
 #[poise::command(slash_command, subcommands("preview", "set"))]
 pub async fn color(_ctx: Context<'_>) -> Result {
     Ok(())
 }
 
-/// previews a specific hexadecimal color
+/// Preview what a hex colour looks like as a 256×256 PNG swatch.
+///
+/// Accepts bare hex (`FF8800`) or `0x`-prefixed (`0xFF8800`). The image is
+/// attached directly to the response so you can see the exact colour before
+/// committing to buying a role with it.
 #[poise::command(slash_command)]
 pub async fn preview(
     ctx: Context<'_>,
@@ -115,8 +152,7 @@ pub async fn preview(
     let color = poise::serenity_prelude::Colour::new(
         u32::from_str_radix(trimmed, 16).map_err(|_| ColorError::IncorrectFormat)?,
     );
-    let size: u32 = 256;
-    let mut img = image::RgbaImage::new(size, size);
+    let mut img = image::RgbaImage::new(COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE);
     for px in img.pixels_mut() {
         *px = image::Rgba([color.r(), color.g(), color.b(), 255]);
     }
@@ -129,7 +165,7 @@ pub async fn preview(
 
         let encoder = PngEncoder::new(&mut png_bytes);
 
-        encoder.write_image(&img, size, size, ColorType::Rgba8.into())?;
+        encoder.write_image(&img, COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE, ColorType::Rgba8.into())?;
     }
 
     let filename = "color.png";
@@ -150,14 +186,25 @@ pub async fn preview(
     Ok(())
 }
 
-/// sets your role and role color to your choice. Costs 10 tabs to do so.
-#[poise::command(slash_command)]
+/// Set your custom colour role name and colour for [`COLOR_ROLE_COST`] tabs.
+///
+/// Custom roles are identified by a leading zero-width space (`\u{200B}`) in
+/// their name, which keeps them distinct from normal server roles. If you
+/// already have a colour role it is updated in-place; otherwise a new role is
+/// created and assigned to you.
+///
+/// The tab charge only happens *after* the Discord API calls succeed, so a
+/// failed role creation never costs you tabs.
+///
+/// **Special case:** a colour value of `#000000` (pure black) is silently
+/// converted to `rgb(1, 1, 1)` because Discord treats role colour `0` as
+/// "no colour" and renders it as the default text colour instead of black.
+#[poise::command(slash_command, guild_only)]
 pub async fn set(
     ctx: Context<'_>,
     #[description = "Name of your role."] name: String,
     #[description = "Color of your role."] color: String,
 ) -> Result {
-    const COST: i64 = 10;
     let user_id = ctx.author().id;
     let guild_id = ctx.guild_id().unwrap();
     // rebinding name with zero-width
@@ -176,11 +223,7 @@ pub async fn set(
         poise::serenity_prelude::Colour::new(color_integer)
     };
 
-    let tabs = ctx
-        .data()
-        .with_wallet_user_write(user_id, |user| user.remove_tabs(COST))
-        .await?;
-
+    // Do all guild API work first — only charge tabs on success.
     let member = guild_id.member(ctx.http(), user_id).await?;
     let member_role_ids = member.roles.clone();
     let guild_roles = guild_id.roles(ctx.http()).await?;
@@ -209,16 +252,28 @@ pub async fn set(
         member.add_role(ctx.http(), r.id).await?;
     }
 
-    ctx.send(Reply::default().embed(utils::create_embed_builder(
+    let tabs = ctx
+        .data()
+        .with_wallet_user_write(user_id, |user| user.remove_tabs(COLOR_ROLE_COST))
+        .await?;
+
+    ctx.send(utils::reply_ok(
         "Set Color",
-        format!("Your color has been set! You now have **{tabs} <:tab:1459045305084547123>!**"),
-        EmbedType::Good,
-    )))
+        format!("Your color has been set! You now have **{tabs} {TAB_EMOJI}!**"),
+    ))
     .await?;
 
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Admin prefix commands (owner-only)
+// ---------------------------------------------------------------------------
+
+/// Register slash commands globally (owner-only, prefix command).
+///
+/// Opens the interactive Poise registration UI. Only works for `FIZZ_ID`;
+/// silently does nothing for anyone else.
 #[poise::command(prefix_command)]
 pub async fn register(ctx: Context<'_>) -> Result {
     if ctx.author().id != FIZZ_ID {
@@ -230,6 +285,9 @@ pub async fn register(ctx: Context<'_>) -> Result {
     Ok(())
 }
 
+/// Give tabs to any user (owner-only, prefix command).
+///
+/// Usage: `!give_tabs @user 50`
 #[poise::command(prefix_command)]
 pub async fn give_tabs(ctx: Context<'_>, user: User, tabs: i64) -> Result {
     if ctx.author().id != FIZZ_ID {
@@ -247,6 +305,13 @@ pub async fn give_tabs(ctx: Context<'_>, user: User, tabs: i64) -> Result {
     Ok(())
 }
 
+/// Retrofit old colour roles with the zero-width-space name prefix (owner-only).
+///
+/// Custom colour roles are identified by a leading `\u{200B}` in their name.
+/// This one-off utility command adds that prefix to an existing role that was
+/// created before the convention was introduced.
+///
+/// Usage: `!fix_color_role_names <role_id>`
 #[poise::command(prefix_command)]
 pub async fn fix_color_role_names(ctx: Context<'_>, role_id: u64) -> Result {
     if ctx.author().id != FIZZ_ID {
