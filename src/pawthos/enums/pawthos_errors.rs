@@ -13,6 +13,7 @@
 use crate::dectalk::DectalkError;
 use crate::pawthos::enums::color_errors::ColorError;
 use crate::pawthos::enums::mimic_errors::MimicError;
+use crate::pawthos::enums::profile_errors::ProfileError;
 use crate::pawthos::enums::schedule_errors::ScheduleError;
 use crate::pawthos::enums::wallet_errors::WalletError;
 
@@ -62,6 +63,10 @@ pub enum PawthosErrors {
     /// An error from colour parsing or image generation.
     #[error("ColorError: {0}")]
     Color(#[from] ColorError),
+
+    /// An error from the profile sub-system.
+    #[error("ProfileError: {0}")]
+    Profile(#[from] ProfileError),
 }
 
 /// Convert a `chrono::ParseError` directly into a `PawthosErrors` by routing

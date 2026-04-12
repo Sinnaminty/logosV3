@@ -1,7 +1,8 @@
 //! The aggregate per-user record stored in [`super::user_db::UserDB`].
 
 use crate::pawthos::structs::{
-    mimic_user::MimicUser, schedule_user::ScheduleUser, wallet_user::WalletUser,
+    mimic_user::MimicUser, profile_user::ProfileUser, schedule_user::ScheduleUser,
+    wallet_user::WalletUser,
 };
 use serde::{Deserialize, Serialize};
 
@@ -28,4 +29,8 @@ pub struct User {
     /// State for the wallet (`/daily`, `/balance`, `/color set`).
     #[serde(default)]
     pub wallet: WalletUser,
+
+    /// State for the `/profile` command suite.
+    #[serde(default)]
+    pub profile: ProfileUser,
 }

@@ -11,7 +11,7 @@
 //! - [`schedule`] — timezone-aware event reminders.
 //! - [`vox`] — DECtalk text-to-speech synthesis.
 
-use crate::commands::{mimic::*, schedule::*, vox::*};
+use crate::commands::{mimic::*, profile::*, schedule::*, vox::*};
 use crate::pawthos::consts::{COLOR_PREVIEW_SIZE, COLOR_ROLE_COST, DAILY_REWARD, FIZZ_ID, TAB_EMOJI};
 use crate::pawthos::enums::color_errors::ColorError;
 use crate::pawthos::{
@@ -23,6 +23,7 @@ use crate::utils::{self};
 use image::ImageEncoder;
 use poise::serenity_prelude::{self as serenity, EditRole, RoleId, User};
 mod mimic;
+mod profile;
 mod schedule;
 mod vox;
 
@@ -43,6 +44,7 @@ pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
         mimic(),
         schedule(),
         color(),
+        profile(),
         fix_color_role_names(),
     ]
 }
@@ -58,8 +60,9 @@ pub async fn help(
     #[description = "Specific command to show help about"] command: Option<String>,
 ) -> Result {
     let config = poise::builtins::HelpConfiguration {
-        show_subcommands: true,
+        show_subcommands: false,
         include_description: true,
+        extra_text_at_bottom: "Type /help <command> for details on a specific command.",
         ..Default::default()
     };
 

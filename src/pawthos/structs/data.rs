@@ -18,14 +18,18 @@
 
 use crate::pawthos::enums::mimic_errors::MimicError;
 use crate::pawthos::enums::persistent_data::{PersistentData, UserDailyClaimed};
+use crate::pawthos::enums::profile_errors::ProfileError;
 use crate::pawthos::enums::schedule_errors::ScheduleError;
 use crate::pawthos::enums::wallet_errors::WalletError;
 use crate::pawthos::structs::mimic_user::MimicUser;
+use crate::pawthos::structs::profile_user::ProfileUser;
 use crate::pawthos::structs::schedule_event::ScheduleEvent;
 use crate::pawthos::structs::schedule_user::ScheduleUser;
 use crate::pawthos::structs::user_db::UserDB;
 use crate::pawthos::structs::wallet_user::WalletUser;
-use crate::pawthos::traits::{MimicDbMarker, ScheduleDbMarker, UserDbSpec, WalletDbMarker};
+use crate::pawthos::traits::{
+    MimicDbMarker, ProfileDbMarker, ScheduleDbMarker, UserDbSpec, WalletDbMarker,
+};
 use chrono::{Duration, Local, NaiveTime};
 use poise::serenity_prelude::UserId;
 use tokio::sync::RwLock;
@@ -177,6 +181,14 @@ impl Data {
         WalletUser,
         WalletError,
         WalletError::NoUserFound
+    );
+    def_db_access!(
+        with_profile_user_read,
+        with_profile_user_write,
+        ProfileDbMarker,
+        ProfileUser,
+        ProfileError,
+        ProfileError::NoUserFound
     );
 
     /// Attempt to grant the daily tab reward to a user.

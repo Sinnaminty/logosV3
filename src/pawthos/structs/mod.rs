@@ -15,9 +15,11 @@
 //! | [`user_db`] | [`user_db::UserDB`] — the top-level `HashMap<UserId, User>` |
 //! | [`wallet_user`] | Per-user wallet state: tab balance and owned roles |
 
+pub mod badge;
 pub mod data;
 pub mod mimic;
 pub mod mimic_user;
+pub mod profile_user;
 pub mod schedule_event;
 pub mod schedule_user;
 pub mod user;
