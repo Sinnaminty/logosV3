@@ -1,11 +1,14 @@
 use crate::pawthos::enums::mimic_errors::MimicError;
-use crate::pawthos::enums::persistant_data::PersistantData;
+use crate::pawthos::enums::persistant_data::{PersistantData, UserDailyClaimed};
 use crate::pawthos::enums::schedule_errors::ScheduleError;
+use crate::pawthos::enums::wallet_errors::WalletError;
 use crate::pawthos::structs::mimic_user::MimicUser;
 use crate::pawthos::structs::schedule_event::ScheduleEvent;
 use crate::pawthos::structs::schedule_user::ScheduleUser;
 use crate::pawthos::structs::user_db::UserDB;
-use crate::pawthos::traits::{MimicDbMarker, ScheduleDbMarker, UserDbSpec};
+use crate::pawthos::structs::wallet_user::WalletUser;
+use crate::pawthos::traits::{MimicDbMarker, ScheduleDbMarker, UserDbSpec, WalletDbMarker};
+use chrono::{Duration, Local, NaiveTime};
 use poise::serenity_prelude::UserId;
 use tokio::sync::RwLock;
 
@@ -53,7 +56,8 @@ impl Data {
         result
     }
 
-    //public interfaces :3c
+    //
+    // public interfaces :3c
     //
     // Mimic
     //
@@ -67,7 +71,6 @@ impl Data {
         })
         .await
     }
-
     pub async fn with_mimic_user_write<R, F>(&self, user_id: UserId, f: F) -> Result<R, MimicError>
     where
         F: for<'a> FnOnce(&'a mut MimicUser) -> Result<R, MimicError>,
@@ -75,6 +78,7 @@ impl Data {
         self.with_db_user_write::<MimicDbMarker, _, _>(user_id, |user| f(user))
             .await
     }
+
     //
     // Schedule
     //
@@ -92,7 +96,6 @@ impl Data {
         })
         .await
     }
-
     pub async fn with_schedule_user_write<R, F>(
         &self,
         user_id: UserId,
@@ -103,5 +106,65 @@ impl Data {
     {
         self.with_db_user_write::<ScheduleDbMarker, _, _>(user_id, |user| f(user))
             .await
+    }
+
+    //
+    // Wallet
+    //
+    pub async fn with_wallet_user_read<R, F>(&self, user_id: UserId, f: F) -> Result<R, WalletError>
+    where
+        F: for<'a> FnOnce(&'a WalletUser) -> Result<R, WalletError>,
+    {
+        self.with_db_user_read::<WalletDbMarker, _, _>(user_id, |maybe_user| {
+            let user = maybe_user.ok_or(WalletError::NoUserFound)?;
+            f(user)
+        })
+        .await
+    }
+    pub async fn with_wallet_user_write<R, F>(
+        &self,
+        user_id: UserId,
+        f: F,
+    ) -> Result<R, WalletError>
+    where
+        F: for<'a> FnOnce(&'a mut WalletUser) -> Result<R, WalletError>,
+    {
+        self.with_db_user_write::<WalletDbMarker, _, _>(user_id, |user| f(user))
+            .await
+    }
+
+    pub async fn wallet_user_daily(&self, user_id: UserId) -> Result<i64, WalletError> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        self.persistant_data_channel
+            .send(PersistantData::DailyCheck {
+                user_id: user_id.into(),
+                sender: tx,
+            })
+            .await
+            .expect("Persistant Data Channel should be open.");
+
+        let Ok(daily_claimed) = rx.await else {
+            log::error!("recv error in DailyCheck!!");
+            return Err(WalletError::RecvError);
+        };
+
+        //if daily daily_claimed, return daily error
+        //else, add 10 tabs to user account and return number of tabs
+
+        if daily_claimed == UserDailyClaimed::Claimed {
+            let now = Local::now();
+            let midnight = (Local::now() + Duration::days(1))
+                .with_time(NaiveTime::MIN)
+                .unwrap();
+            let remaining = midnight - now;
+
+            Err(WalletError::DailyOnCooldown {
+                remaining_secs: remaining.num_seconds(),
+            })
+        } else {
+            self.with_wallet_user_write(user_id, |user| Ok(user.claim_daily()))
+                .await
+        }
     }
 }
