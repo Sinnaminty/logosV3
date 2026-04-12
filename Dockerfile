@@ -14,34 +14,35 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=planner /app/recipe.json recipe.json
 
-# cache build dependencies
+# build.rs needs DECtalk headers + libs for bindgen and linking
+COPY vendor/ vendor/
+
+# Cache build dependencies
 RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY . .
-# rebuild real binary
 RUN cargo build --release
 
 ########## Runtime ##########
 FROM debian:bookworm-slim
 
-# Minimal runtime deps
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates pulseaudio && \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Run as non-root
 RUN useradd -m app
 WORKDIR /app
 
-# Copy the compiled binary (package name defaults to repo name)
-ARG BIN=logosV3
+# Copy the compiled binary
+COPY --from=builder /app/target/release/logosV3 /app/bot
 
-COPY --from=builder /app/target/release/${BIN} /app/bot
+# DECtalk runtime: shared objects, dictionaries, and config
+COPY vendor/dectalk/dist/*.so vendor/dectalk/dist/
+COPY vendor/dectalk/dist/*.dic vendor/dectalk/dist/
+COPY DECtalk.conf .
 
-COPY . .
 ENV LD_LIBRARY_PATH=/app/vendor/dectalk/dist
 ENV RUST_LOG=info
 ENV RUST_BACKTRACE=1
 USER app
 
-# Run it!
 CMD ["/app/bot"]

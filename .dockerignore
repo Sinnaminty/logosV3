@@ -4,4 +4,7 @@ target
 **/.DS_Store
 **/node_modules
 **/*.wav
+s.json
+user.json
+wallet_list.json
 

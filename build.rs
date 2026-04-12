@@ -28,8 +28,11 @@ fn main() {
     println!("cargo:rustc-link-lib=static=tts_uk");
     println!("cargo:rustc-link-lib=static=tts_us");
 
-    // Optional (Linux): embed an rpath so the binary can find libtts.so at runtime.
-    // Comment out if you prefer exporting LD_LIBRARY_PATH instead.
+    // Embed an rpath so the binary can find libtts.so at runtime without
+    // needing LD_LIBRARY_PATH (Docker sets LD_LIBRARY_PATH as a fallback).
     #[cfg(target_os = "linux")]
-    println!("cargo:rustc-link-arg=-Wl,-rpath,/home/fizz/repos/logosV3/vendor/dectalk/dist");
+    {
+        let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{manifest_dir}/vendor/dectalk/dist");
+    }
 }
