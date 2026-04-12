@@ -312,7 +312,7 @@ pub async fn give_tabs(ctx: Context<'_>, user: User, tabs: i64) -> Result {
 /// created before the convention was introduced.
 ///
 /// Usage: `!fix_color_role_names <role_id>`
-#[poise::command(prefix_command)]
+#[poise::command(prefix_command, guild_only)]
 pub async fn fix_color_role_names(ctx: Context<'_>, role_id: u64) -> Result {
     if ctx.author().id != FIZZ_ID {
         return Ok(());

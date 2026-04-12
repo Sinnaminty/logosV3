@@ -29,7 +29,7 @@ pub const LOGOS_RED: Color = Color::from_rgb(255, 0, 0);
 /// Discord user ID of the bot owner (Fizzy).
 ///
 /// Several admin-only prefix commands gate on this ID to prevent abuse.
-pub const FIZZ_ID: u64 = 326389428593623040;
+pub const FIZZ_ID: serenity::UserId = serenity::UserId::new(326389428593623040);
 
 /// Number of tabs awarded by the `/daily` command.
 pub const DAILY_REWARD: i64 = 10;

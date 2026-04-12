@@ -44,6 +44,16 @@ pub async fn mimic(ctx: Context<'_>, #[autocomplete = "fetch_mimics"] name: Stri
                 .ok_or(MimicError::MimicNotFound)?;
 
             let removed = user.mimics.remove(idx);
+
+            // Clear active_mimic if it references the deleted mimic.
+            if user.active_mimic.as_ref() == Some(&removed) {
+                user.active_mimic = None;
+                user.auto_mode = false;
+            }
+
+            // Clear any channel overrides that reference the deleted mimic.
+            user.channel_override.retain(|_, m| *m != removed);
+
             Ok(removed.name)
         })
         .await?;

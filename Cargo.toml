@@ -12,13 +12,9 @@ poise = { version = "0.6.1", features = ["cache"] }
 serde = "1.0.225"
 simple_logger = "5.0.0"
 tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
-hound = "3"                                                              # For WAV writing when only raw PCM is returned by the SDK
-sled = "0.34"
-parking_lot = "0.12.5"
 serde_json = "1.0.145"
 thiserror = "2.0.17"
 chrono-tz = { version = "0.10.4", features = ["serde"] }
-rand = "0.9.2"
 image = "0.25.9"
 
 [build-dependencies]

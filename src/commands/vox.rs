@@ -14,8 +14,7 @@ use poise::serenity_prelude as serenity;
 /// This is a parent command; use `/vox say` to synthesise speech.
 #[poise::command(slash_command, subcommands("say"), subcommand_required)]
 pub async fn vox(_: Context<'_>) -> Result {
-    //lmao, again
-    panic!();
+    Ok(())
 }
 
 /// Synthesise text as speech using the DECtalk TTS engine and post the WAV.
