@@ -1,7 +1,6 @@
-use crate::pawthos::structs::{mimic_db::MimicDB, schedule_db::ScheduleDB};
+use crate::pawthos::structs::user_db::UserDB;
 
 #[derive(Debug)]
 pub enum PersistantData {
-    MimicDB(MimicDB),
-    ScheduleDB(ScheduleDB),
+    UserDB(UserDB),
 }

@@ -11,11 +11,7 @@ pub async fn vox(_: Context<'_>) -> Result {
 
 /// Genereates a sound file with the Dectalk API.
 #[poise::command(slash_command)]
-pub async fn say(
-    ctx: Context<'_>,
-    #[description = "Text to synthesize"] text: String,
-    #[description = "Words per minute"] rate: Option<u32>,
-) -> Result {
+pub async fn say(ctx: Context<'_>, #[description = "Text to synthesize"] text: String) -> Result {
     let path = tokio::task::spawn_blocking(move || -> Result<std::path::PathBuf> {
         use std::{
             env,
@@ -24,9 +20,6 @@ pub async fn say(
 
         // Create and use DECtalk entirely on this blocking thread.
         let tts = Dectalk::new()?;
-        if let Some(r) = rate {
-            let _ = tts.set_rate(r);
-        }
 
         // Pick a temp path
         let ts = SystemTime::now()

@@ -4,7 +4,7 @@ use crate::pawthos::{
     structs::mimic::Mimic,
     types::{Context, Embed, Reply, Result},
 };
-use crate::utils;
+use crate::utils::{self, create_embed_builder};
 use poise::serenity_prelude as serenity;
 use serenity::{AutocompleteChoice, ExecuteWebhook};
 mod delete;
@@ -91,7 +91,14 @@ pub async fn list(ctx: Context<'_>) -> Result {
                     }
                     embed
                 })
-                .fold(Reply::default(), |r, e| r.embed(e)))
+                .fold(
+                    Reply::default().embed(create_embed_builder(
+                        "Mimic List",
+                        "",
+                        EmbedType::Neutral,
+                    )),
+                    |r, e| r.embed(e),
+                ))
         })
         .await?;
 

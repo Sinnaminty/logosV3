@@ -84,10 +84,6 @@ impl Dectalk {
         Ok(Self { handle })
     }
 
-    pub fn set_rate(&self, wpm: u32) -> Result<(), DectalkError> {
-        check_mm(unsafe { TextToSpeechSetRate(self.handle.as_ptr(), wpm as DWORD) })?;
-        Ok(())
-    }
     pub fn speak_to_wav(
         &self,
         text: &str,

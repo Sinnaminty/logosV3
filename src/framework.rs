@@ -1,56 +1,34 @@
 use crate::commands;
 use crate::handlers;
 use crate::pawthos::enums::persistant_data::PersistantData;
-use crate::pawthos::structs::schedule_db::ScheduleDB;
+use crate::pawthos::structs::data::Data;
 use crate::pawthos::structs::schedule_event::ScheduleEvent;
-use crate::pawthos::structs::{data::Data, mimic_db::MimicDB};
+use crate::pawthos::structs::user_db::UserDB;
 use crate::pawthos::types::{Error, Result};
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::User;
 use poise::serenity_prelude::UserId;
 use tokio::sync::RwLock;
 
 const BUFFER_SIZE: usize = 1;
 
-fn save_mimic_db(db: MimicDB) -> Result {
+fn save_user_db(db: UserDB) -> Result {
     let db_json = poise::serenity_prelude::json::to_string(&db)?;
-    std::fs::write("mimic.json", db_json)?;
-    log::debug!("mimic_db saved :3c");
-    Ok(())
-}
-
-fn save_schedule_db(db: ScheduleDB) -> Result {
-    let db_json = poise::serenity_prelude::json::to_string(&db)?;
-    std::fs::write("schedule.json", db_json)?;
-    log::debug!("schedule_db saved :3c");
+    std::fs::write("user.json", db_json)?;
+    log::debug!("user.json saved :3c");
     Ok(())
 }
 
 pub fn setup_framework() -> poise::Framework<Data, Error> {
-    let mimic_db = std::fs::read_to_string("mimic.json").map(serenity::json::from_str::<MimicDB>);
+    let user_db = std::fs::read_to_string("user.json").map(serenity::json::from_str::<UserDB>);
 
-    let mimic_db = match mimic_db {
+    let user_db = match user_db {
         Ok(Ok(db)) => {
-            log::info!("mimic.json found, importing db..");
+            log::info!("user.json found, importing db..");
             db
         }
         Ok(Err(e)) => panic!("file is there but.. serializtion failed? {e}"), //* serializaiton failed!
         Err(_) => {
-            log::warn!("mimic.json NOT found, making new db..");
-            Default::default()
-        }
-    };
-
-    let schedule_db =
-        std::fs::read_to_string("schedule.json").map(serenity::json::from_str::<ScheduleDB>);
-    let schedule_db = match schedule_db {
-        Ok(Ok(db)) => {
-            log::info!("schedule.json found, importing db..");
-            db
-        }
-        Ok(Err(e)) => panic!("file is there but.. serializtion failed? {e}"), //* serializaiton failed!
-        Err(_) => {
-            log::warn!("schedule.json NOT found, making new db..");
+            log::warn!("user.json NOT found, making new db..");
             Default::default()
         }
     };
@@ -60,14 +38,9 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
         while let Some(update) = recv.recv().await {
             log::debug!("update received! type: {:?}", update);
             match update {
-                PersistantData::MimicDB(mimic_db_snapshot) => {
-                    if let Err(e) = save_mimic_db(mimic_db_snapshot) {
-                        log::error!("Failed to save MimicDB: {:?}", e);
-                    }
-                }
-                PersistantData::ScheduleDB(schedule_db_snapshot) => {
-                    if let Err(e) = save_schedule_db(schedule_db_snapshot) {
-                        log::error!("Failed to save ScheduleDB: {:?}", e);
+                PersistantData::UserDB(user_db_snapshot) => {
+                    if let Err(e) = save_user_db(user_db_snapshot) {
+                        log::error!("Failed to save UserDB: {:?}", e);
                     }
                 }
             };
@@ -121,15 +94,14 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
             });
 
             let send2 = send_tasks.clone();
-            schedule_db.get_events().into_iter().for_each(|pair| {
+            user_db.get_events().into_iter().for_each(|pair| {
                 send2.send(pair).unwrap();
             });
 
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(Data {
-                    mimic_db: RwLock::new(mimic_db),
-                    schedule_db: RwLock::new(schedule_db),
+                    user_db: RwLock::new(user_db),
                     persistant_data_channel: send,
                     schedule_events_channel: send_tasks,
                 })
