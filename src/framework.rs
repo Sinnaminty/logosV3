@@ -17,16 +17,22 @@
 
 use crate::commands;
 use crate::handlers;
+use crate::pawthos::consts::FAUCET_EXPIRY_SECS;
 use crate::pawthos::enums::persistent_data::PersistentData;
 use crate::pawthos::enums::persistent_data::UserDailyClaimed;
-use crate::pawthos::structs::data::Data;
+use crate::pawthos::structs::data::{BountyState, Data};
 use crate::pawthos::structs::schedule_event::ScheduleEvent;
 use crate::pawthos::structs::user_db::UserDB;
 use crate::pawthos::types::{Error, Result};
+use crate::utils;
+use chrono::Utc;
 use poise::serenity_prelude as serenity;
-use poise::serenity_prelude::UserId;
+use poise::serenity_prelude::{ChannelId, MessageId, UserId};
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 
 /// Internal channel buffer size for the persistence task.
@@ -71,6 +77,44 @@ fn load_user_db() -> UserDB {
             log::warn!("user.json NOT found, making new db..");
             Default::default()
         }
+    }
+}
+
+/// Run idempotent startup migrations against the in-memory [`UserDB`].
+///
+/// Called once right after [`load_user_db`]. Every rule checks its "is this
+/// already migrated?" condition first so re-running on every startup is safe.
+///
+/// # Current migrations
+///
+/// - **Grandfather custom colorway unlock** (Phase 3): if a user already has
+///   a custom colorway set but no inventory entry records the unlock, flip
+///   the flag so they don't lose access to `/profile set colorway`.
+/// - **Grandfather custom banner unlock** (Phase 4): analogous for banner.
+fn run_migrations(user_db: &mut UserDB) {
+    let mut colorway_grandfathered = 0u32;
+    let mut banner_grandfathered = 0u32;
+
+    for user in user_db.db.values_mut() {
+        if user.profile.colorway.is_some() && !user.inventory.unlocked_custom_colorway {
+            user.inventory.unlocked_custom_colorway = true;
+            colorway_grandfathered += 1;
+        }
+        if user.profile.banner_url.is_some() && !user.inventory.unlocked_custom_banner {
+            user.inventory.unlocked_custom_banner = true;
+            banner_grandfathered += 1;
+        }
+    }
+
+    if colorway_grandfathered > 0 {
+        log::info!(
+            "Migration: grandfathered {colorway_grandfathered} custom colorway unlock(s)",
+        );
+    }
+    if banner_grandfathered > 0 {
+        log::info!(
+            "Migration: grandfathered {banner_grandfathered} custom banner unlock(s)",
+        );
     }
 }
 
@@ -163,7 +207,8 @@ fn daily_check(id: u64) -> Result<UserDailyClaimed, Error> {
 /// This is the primary entry point called from [`crate::setup`]. See the
 /// module-level documentation for the full startup sequence.
 pub fn setup_framework() -> poise::Framework<Data, Error> {
-    let user_db = load_user_db();
+    let mut user_db = load_user_db();
+    run_migrations(&mut user_db);
 
     // --- Persistence task ---------------------------------------------------
     // All DB snapshots and daily-check requests flow through this channel.
@@ -211,6 +256,28 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
         })
         .setup(|ctx, _ready, framework| {
             let http = ctx.http.clone(); // one.
+
+            // --- Faucet state + cleanup task --------------------------------
+            // Bounty state is purely in-memory: a bot restart forfeits any
+            // live bounties but doesn't leak user tabs. The cleanup task
+            // periodically sweeps expired bounties so the bot's reaction
+            // doesn't linger on old messages.
+            let faucet_bounties: Arc<RwLock<HashMap<MessageId, BountyState>>> =
+                Arc::new(RwLock::new(HashMap::new()));
+            let faucet_last_spawn: Arc<RwLock<Option<chrono::DateTime<Utc>>>> =
+                Arc::new(RwLock::new(None));
+            {
+                let bounties = faucet_bounties.clone();
+                let http = http.clone();
+                tokio::spawn(async move {
+                    let mut interval =
+                        tokio::time::interval(Duration::from_secs(FAUCET_EXPIRY_SECS as u64 / 10));
+                    loop {
+                        interval.tick().await;
+                        cleanup_expired_bounties(&bounties, &http).await;
+                    }
+                });
+            }
 
             // --- Schedule reminder task -------------------------------------
             // The outer loop receives (UserId, ScheduleEvent) pairs and spawns
@@ -264,8 +331,50 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
                     user_db: RwLock::new(user_db),
                     persistent_data_channel: send,
                     schedule_events_channel: send_tasks,
+                    faucet_bounties,
+                    faucet_last_spawn,
                 })
             })
         })
         .build()
+}
+
+// ---------------------------------------------------------------------------
+// Faucet cleanup
+// ---------------------------------------------------------------------------
+
+/// Remove bot reactions from expired faucet bounties and drop them from the map.
+///
+/// Called on a timer (every `FAUCET_EXPIRY_SECS / 10` seconds, so with the
+/// default 600 s expiry we run every minute). Reactions on deleted messages
+/// return a Discord error which we log at debug and ignore.
+async fn cleanup_expired_bounties(
+    bounties: &RwLock<HashMap<MessageId, BountyState>>,
+    http: &serenity::Http,
+) {
+    let now = Utc::now();
+    let expired: Vec<(MessageId, ChannelId)> = {
+        let b = bounties.read().await;
+        b.iter()
+            .filter(|(_, s)| s.expires_at < now)
+            .map(|(id, s)| (*id, s.channel_id))
+            .collect()
+    };
+    if expired.is_empty() {
+        return;
+    }
+
+    for (msg_id, chan_id) in &expired {
+        if let Err(e) = chan_id
+            .delete_reaction(http, *msg_id, None, utils::tab_reaction())
+            .await
+        {
+            log::debug!("Faucet cleanup — reaction delete on {msg_id} failed: {e}");
+        }
+    }
+
+    let mut b = bounties.write().await;
+    for (msg_id, _) in expired {
+        b.remove(&msg_id);
+    }
 }

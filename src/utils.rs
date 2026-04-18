@@ -4,10 +4,11 @@
 //! three high-level reply helpers ([`reply_ok`], [`reply_err`], [`reply_info`]),
 //! and the webhook fetch-or-create helper used by the mimic feature.
 
+use crate::pawthos::consts::{TAB_EMOJI_ID, TAB_EMOJI_NAME};
 use crate::pawthos::enums::embed_type::EmbedType;
 use crate::pawthos::types::{Embed, Error, Reply};
 use poise::serenity_prelude as serenity;
-use serenity::Webhook;
+use serenity::{EmojiId, ReactionType, Webhook};
 use std::fmt::Display;
 
 // ---------------------------------------------------------------------------
@@ -87,6 +88,34 @@ pub fn create_embed_builder(
         ))
         .author(serenity::builder::CreateEmbedAuthor::new("Logos"))
         .color(embed_type.into_color())
+}
+
+// ---------------------------------------------------------------------------
+// Webhook helpers
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Reaction helpers
+// ---------------------------------------------------------------------------
+
+/// Build a [`ReactionType`] for the custom tab emoji.
+///
+/// Used by the faucet spawn / claim / cleanup paths to add or remove the
+/// bot's tab reaction on a message.
+pub fn tab_reaction() -> ReactionType {
+    ReactionType::Custom {
+        animated: false,
+        id: EmojiId::new(TAB_EMOJI_ID),
+        name: Some(TAB_EMOJI_NAME.to_string()),
+    }
+}
+
+/// Return `true` if `reaction` is the tab custom emoji (matched by ID only).
+///
+/// Names may diverge between servers if the emoji is copied elsewhere; the
+/// numeric ID is the stable identity.
+pub fn is_tab_reaction(reaction: &ReactionType) -> bool {
+    matches!(reaction, ReactionType::Custom { id, .. } if id.get() == TAB_EMOJI_ID)
 }
 
 // ---------------------------------------------------------------------------

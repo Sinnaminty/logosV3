@@ -8,7 +8,8 @@
 //! # Sub-modules
 //! - [`buy`] — purchase subcommands (title, unlock, …).
 
-use crate::commands::shop::buy::*;
+use crate::commands::shop::buy::buy;
+use crate::commands::shop::gift::gift;
 use crate::pawthos::{
     consts::TAB_EMOJI,
     enums::embed_type::EmbedType,
@@ -18,9 +19,10 @@ use crate::pawthos::{
 };
 use crate::utils;
 mod buy;
+mod gift;
 
-/// Shop commands — browse cosmetics, purchase items, view your inventory.
-#[poise::command(slash_command, subcommands("browse", "inventory", "buy"))]
+/// Shop commands — browse cosmetics, purchase items, gift to others, view your inventory.
+#[poise::command(slash_command, subcommands("browse", "inventory", "buy", "gift"))]
 pub async fn shop(_ctx: Context<'_>) -> Result {
     Ok(())
 }
@@ -67,9 +69,29 @@ pub async fn browse(ctx: Context<'_>) -> Result {
     }
 
     if !LOOTBOX_POOL.is_empty() {
+        use crate::pawthos::consts::{
+            LOOTBOX_CHANCE_COMMON, LOOTBOX_CHANCE_LEGENDARY, LOOTBOX_CHANCE_RARE,
+            LOOTBOX_CHANCE_UNCOMMON, LOOTBOX_SALVAGE,
+        };
+        use crate::pawthos::structs::shop_catalog::Rarity;
+        let count_of = |r: Rarity| -> usize {
+            LOOTBOX_POOL.iter().filter(|b| b.item.rarity == r).count()
+        };
         description.push_str(&format!(
-            "**🎁 Badge Lootbox** — `{}` · {} {TAB_EMOJI} per pull\n*{}*\n\n",
-            LOOTBOX_ITEM.id, LOOTBOX_ITEM.cost, LOOTBOX_ITEM.description,
+            "**🎁 Badge Lootbox** — `/shop buy lootbox` · {} {TAB_EMOJI} per pull\n\
+             *{}*\n\
+             Duplicates salvage for **{LOOTBOX_SALVAGE} {TAB_EMOJI}**.\n\n\
+             **Odds:**\n\
+             🟢 Common {:.0}% — {} items\n\
+             🔵 Uncommon {:.0}% — {} items\n\
+             🟣 Rare {:.0}% — {} items\n\
+             🟡 Legendary {:.0}% — {} items\n\n",
+            LOOTBOX_ITEM.cost,
+            LOOTBOX_ITEM.description,
+            LOOTBOX_CHANCE_COMMON * 100.0, count_of(Rarity::Common),
+            LOOTBOX_CHANCE_UNCOMMON * 100.0, count_of(Rarity::Uncommon),
+            LOOTBOX_CHANCE_RARE * 100.0, count_of(Rarity::Rare),
+            LOOTBOX_CHANCE_LEGENDARY * 100.0, count_of(Rarity::Legendary),
         ));
     }
 

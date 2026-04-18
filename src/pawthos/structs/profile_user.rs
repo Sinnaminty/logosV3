@@ -60,4 +60,25 @@ pub struct ProfileUser {
     /// instead of resolving `active_title_id`.
     #[serde(default)]
     pub use_custom_title: bool,
+
+    /// ID of the equipped named colorway. Takes precedence over
+    /// [`Self::colorway`] when rendering `/profile view`.
+    #[serde(default)]
+    pub active_colorway_id: Option<String>,
+
+    /// ID of the equipped named banner. Takes precedence over
+    /// [`Self::banner_url`] when rendering `/profile view`.
+    #[serde(default)]
+    pub active_banner_id: Option<String>,
+
+    /// Badge IDs pinned to the user's profile card, in display order.
+    ///
+    /// Capped at [`crate::pawthos::consts::MAX_ACTIVE_BADGES`] by the
+    /// `/profile set badges` command. IDs may reference entries in either
+    /// [`crate::pawthos::structs::shop_catalog::LOOTBOX_POOL`] (`box_*`
+    /// prefix) or [`crate::pawthos::structs::shop_catalog::ACHIEVEMENTS`]
+    /// (`ach_*` prefix). The resolver in `/profile view` checks both and
+    /// skips any that don't match a live catalog entry.
+    #[serde(default)]
+    pub active_badge_ids: Vec<String>,
 }

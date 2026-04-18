@@ -8,7 +8,8 @@
 //! - [`set`] — subcommands for customising profile fields.
 //! - [`unset`] — subcommands for clearing equipped items.
 
-use crate::commands::profile::{set::*, unset::*};
+use crate::commands::profile::set::set;
+use crate::commands::profile::unset::unset;
 use crate::pawthos::{
     consts::{LOGOS_GREEN, TAB_EMOJI},
     enums::embed_type::EmbedType,
@@ -61,10 +62,7 @@ pub async fn view(
         .await
         .unwrap_or(0);
 
-    let accent = profile
-        .colorway
-        .map(Color::new)
-        .unwrap_or(LOGOS_GREEN);
+    let accent = resolve_colorway(&profile);
 
     let bio = profile
         .bio
@@ -77,16 +75,7 @@ pub async fn view(
         None => bio.to_string(),
     };
 
-    let badge_display = if profile.badges.is_empty() {
-        "None".to_string()
-    } else {
-        profile
-            .badges
-            .iter()
-            .map(|b| b.to_string())
-            .collect::<Vec<_>>()
-            .join(" ")
-    };
+    let badge_display = render_active_badges(&profile, &inventory);
 
     let display_name = target
         .global_name
@@ -107,7 +96,7 @@ pub async fn view(
     .field("Badges", &badge_display, true)
     .field("Balance", format!("{tabs} {TAB_EMOJI}"), true);
 
-    if let Some(banner) = &profile.banner_url {
+    if let Some(banner) = resolve_banner(&profile) {
         embed = embed.image(banner);
     }
 
@@ -127,4 +116,62 @@ fn resolve_title(profile: &ProfileUser, inventory: &InventoryUser) -> Option<Str
     } else {
         None
     }
+}
+
+/// Resolve which accent colour to render.
+///
+/// Priority: named colorway (catalog lookup) → custom hex → default.
+fn resolve_colorway(profile: &ProfileUser) -> Color {
+    if let Some(ref id) = profile.active_colorway_id
+        && let Some(def) = shop_catalog::lookup_colorway(id)
+    {
+        return Color::new(def.hex);
+    }
+    profile.colorway.map(Color::new).unwrap_or(LOGOS_GREEN)
+}
+
+/// Resolve which banner URL (if any) to render.
+///
+/// Priority: named banner (catalog lookup) → custom URL → none.
+fn resolve_banner(profile: &ProfileUser) -> Option<String> {
+    if let Some(ref id) = profile.active_banner_id
+        && let Some(def) = shop_catalog::lookup_banner(id)
+    {
+        return Some(def.url.to_string());
+    }
+    profile.banner_url.clone()
+}
+
+/// Render the Badges field on `/profile view`.
+///
+/// Priority:
+/// 1. `active_badge_ids` — pinned slots, each resolved via
+///    [`shop_catalog::resolve_badge_display`]. Any ID the user no longer
+///    owns or that no longer exists in the catalog is silently dropped.
+/// 2. Legacy `profile.badges` — only shown if `active_badge_ids` is empty,
+///    so users who never pinned anything still see their old manual badges.
+/// 3. `"None"` otherwise.
+fn render_active_badges(profile: &ProfileUser, inventory: &InventoryUser) -> String {
+    if !profile.active_badge_ids.is_empty() {
+        let rendered: Vec<String> = profile
+            .active_badge_ids
+            .iter()
+            .filter(|id| inventory.owned_badges.iter().any(|o| o == *id))
+            .filter_map(|id| {
+                shop_catalog::resolve_badge_display(id).map(|(e, n)| format!("{e} {n}"))
+            })
+            .collect();
+        if !rendered.is_empty() {
+            return rendered.join(" · ");
+        }
+    }
+    if !profile.badges.is_empty() {
+        return profile
+            .badges
+            .iter()
+            .map(|b| b.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+    }
+    "None".to_string()
 }

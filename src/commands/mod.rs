@@ -17,6 +17,7 @@ use crate::pawthos::consts::{
     COLOR_PREVIEW_SIZE, COLOR_ROLE_COST, DAILY_REWARD, FIZZ_ID, LEADERBOARD_SIZE, TAB_EMOJI,
 };
 use crate::pawthos::enums::color_errors::ColorError;
+use crate::pawthos::structs::shop_catalog::ACHIEVEMENTS;
 use crate::pawthos::{
     enums::embed_type::EmbedType,
     structs::data::Data,
@@ -51,6 +52,7 @@ pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
         profile(),
         shop(),
         leaderboard(),
+        achievements(),
         fix_color_role_names(),
     ]
 }
@@ -129,6 +131,11 @@ pub async fn daily(ctx: Context<'_>) -> Result {
             .ephemeral(true),
     )
     .await?;
+
+    // Phase 7: streak achievements may unlock here.
+    ctx.data()
+        .check_achievements(user_id, ctx.channel_id(), ctx.http())
+        .await;
     Ok(())
 }
 
@@ -197,6 +204,56 @@ pub async fn leaderboard(ctx: Context<'_>) -> Result {
     let embed = utils::create_embed_builder("Tab Leaderboard", description, EmbedType::Neutral);
 
     ctx.send(poise::CreateReply::default().embed(embed))
+        .await?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Achievements
+// ---------------------------------------------------------------------------
+
+/// Show your achievement progress.
+///
+/// Lists every achievement grouped into Unlocked ✅ and Locked 🔒. Response
+/// is ephemeral — only you see it.
+#[poise::command(slash_command)]
+pub async fn achievements(ctx: Context<'_>) -> Result {
+    let user_id = ctx.author().id;
+    let unlocked_ids = ctx
+        .data()
+        .with_inventory_user_read(user_id, |inv| Ok(inv.unlocked_achievements.clone()))
+        .await
+        .unwrap_or_default();
+
+    let (unlocked, locked): (Vec<&_>, Vec<&_>) = ACHIEVEMENTS
+        .iter()
+        .partition(|a| unlocked_ids.iter().any(|id| id == a.id));
+
+    let mut description = String::new();
+    description.push_str(&format!(
+        "**{} / {}** unlocked\n\n",
+        unlocked.len(),
+        ACHIEVEMENTS.len()
+    ));
+
+    if !unlocked.is_empty() {
+        description.push_str("**✅ Unlocked**\n");
+        for a in &unlocked {
+            description.push_str(&format!("{} **{}** — *{}*\n", a.emoji, a.name, a.description));
+        }
+        description.push('\n');
+    }
+
+    if !locked.is_empty() {
+        description.push_str("**🔒 Locked**\n");
+        for a in &locked {
+            description.push_str(&format!("{} **{}** — *{}*\n", a.emoji, a.name, a.description));
+        }
+    }
+
+    let embed =
+        utils::create_embed_builder("Your Achievements", description, EmbedType::Neutral);
+    ctx.send(poise::CreateReply::default().embed(embed).ephemeral(true))
         .await?;
     Ok(())
 }

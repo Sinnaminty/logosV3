@@ -27,15 +27,40 @@ use crate::pawthos::structs::mimic_user::MimicUser;
 use crate::pawthos::structs::profile_user::ProfileUser;
 use crate::pawthos::structs::schedule_event::ScheduleEvent;
 use crate::pawthos::structs::schedule_user::ScheduleUser;
+use crate::pawthos::structs::shop_catalog::ACHIEVEMENTS;
 use crate::pawthos::structs::user_db::UserDB;
 use crate::pawthos::structs::wallet_user::{DailyClaimResult, WalletUser};
 use crate::pawthos::traits::{
     InventoryDbMarker, MimicDbMarker, ProfileDbMarker, ScheduleDbMarker, UserDbSpec,
     WalletDbMarker,
 };
-use chrono::{Duration, Local, NaiveTime};
-use poise::serenity_prelude::UserId;
+use chrono::{DateTime, Duration, Local, NaiveTime, Utc};
+use poise::serenity_prelude::{ChannelId, MessageId, UserId};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
+
+/// Live state for a single in-flight faucet bounty.
+///
+/// Stored in [`Data::faucet_bounties`] keyed by the message ID the bot
+/// reacted to. Removed when either (a) a user claims it by clicking the
+/// reaction, or (b) the cleanup task sweeps it after
+/// [`crate::pawthos::consts::FAUCET_EXPIRY_SECS`].
+#[derive(Debug, Clone)]
+pub struct BountyState {
+    /// Channel the bountied message lives in. Needed to remove the reaction
+    /// when the bounty is resolved or expires.
+    pub channel_id: ChannelId,
+
+    /// Tabs awarded to the claimer. Frozen at spawn time so changes to
+    /// [`crate::pawthos::consts::FAUCET_REWARD`] don't retroactively alter
+    /// existing bounties.
+    pub amount: i64,
+
+    /// UTC instant when this bounty expires. Compared against `Utc::now()`
+    /// by the cleanup sweep.
+    pub expires_at: DateTime<Utc>,
+}
 
 /// Shared bot state; one instance lives for the lifetime of the process.
 ///
@@ -62,6 +87,17 @@ pub struct Data {
     /// Sending `(UserId, ScheduleEvent)` here causes the background scheduler
     /// to spawn a task that sleeps until the event time and then DMs the user.
     pub schedule_events_channel: tokio::sync::mpsc::UnboundedSender<(UserId, ScheduleEvent)>,
+
+    /// Live faucet bounties, keyed by the message ID the bot reacted to.
+    ///
+    /// `Arc` so the cleanup task can hold its own handle. The lock is held
+    /// briefly: spawn adds an entry; claim removes one; cleanup scans and
+    /// removes expired entries.
+    pub faucet_bounties: Arc<RwLock<HashMap<MessageId, BountyState>>>,
+
+    /// Timestamp of the most recent faucet spawn, used to enforce
+    /// [`crate::pawthos::consts::FAUCET_GLOBAL_COOLDOWN_SECS`].
+    pub faucet_last_spawn: Arc<RwLock<Option<DateTime<Utc>>>>,
 }
 
 /// Generates a matching read/write method pair for one feature's user sub-struct.
@@ -263,5 +299,67 @@ impl Data {
         entries.sort_by(|a, b| b.1.cmp(&a.1));
         entries.truncate(limit);
         entries
+    }
+
+    /// Check every achievement predicate against `user_id`'s current state
+    /// and unlock any that newly qualify.
+    ///
+    /// On each unlock, appends the achievement ID to both
+    /// [`InventoryUser::unlocked_achievements`] and
+    /// [`InventoryUser::owned_badges`], then posts a normal (non-ephemeral)
+    /// announcement in `channel_id` so the community sees it.
+    ///
+    /// Safe to call after any stat mutation: the deduplication check against
+    /// `unlocked_achievements` prevents re-announcing.
+    ///
+    /// Errors from the announcement post are logged but not returned —
+    /// achievement progress is data and should never roll back because a
+    /// message failed to send.
+    pub async fn check_achievements(
+        &self,
+        user_id: UserId,
+        channel_id: poise::serenity_prelude::ChannelId,
+        http: &poise::serenity_prelude::Http,
+    ) {
+        // Snapshot both sub-structs under a single read lock.
+        let snapshot = {
+            let db = self.user_db.read().await;
+            db.get_user(user_id)
+                .map(|u| (u.inventory.clone(), u.wallet.clone()))
+        };
+        let Some((inv, wallet)) = snapshot else {
+            return;
+        };
+
+        let newly_unlocked: Vec<&'static _> = ACHIEVEMENTS
+            .iter()
+            .filter(|a| (a.check)(&inv, &wallet))
+            .filter(|a| !inv.unlocked_achievements.iter().any(|x| x == a.id))
+            .collect();
+        if newly_unlocked.is_empty() {
+            return;
+        }
+
+        // Persist the unlocks.
+        let _ = self
+            .with_inventory_user_write(user_id, |inv| {
+                for a in &newly_unlocked {
+                    inv.unlocked_achievements.push(a.id.to_string());
+                    inv.owned_badges.push(a.id.to_string());
+                }
+                Ok(())
+            })
+            .await;
+
+        // Announce.
+        for a in newly_unlocked {
+            let content = format!(
+                "🎉 <@{user_id}> unlocked an achievement: **{} {}**\n*{}*",
+                a.emoji, a.name, a.description,
+            );
+            if let Err(e) = channel_id.say(http, content).await {
+                log::warn!("Achievement announce failed: {e}");
+            }
+        }
     }
 }
