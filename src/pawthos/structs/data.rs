@@ -16,11 +16,13 @@
 //!
 //! [`persistent_data_channel`]: Data::persistent_data_channel
 
+use crate::pawthos::enums::inventory_errors::InventoryError;
 use crate::pawthos::enums::mimic_errors::MimicError;
 use crate::pawthos::enums::persistent_data::{PersistentData, UserDailyClaimed};
 use crate::pawthos::enums::profile_errors::ProfileError;
 use crate::pawthos::enums::schedule_errors::ScheduleError;
 use crate::pawthos::enums::wallet_errors::WalletError;
+use crate::pawthos::structs::inventory_user::InventoryUser;
 use crate::pawthos::structs::mimic_user::MimicUser;
 use crate::pawthos::structs::profile_user::ProfileUser;
 use crate::pawthos::structs::schedule_event::ScheduleEvent;
@@ -28,7 +30,8 @@ use crate::pawthos::structs::schedule_user::ScheduleUser;
 use crate::pawthos::structs::user_db::UserDB;
 use crate::pawthos::structs::wallet_user::{DailyClaimResult, WalletUser};
 use crate::pawthos::traits::{
-    MimicDbMarker, ProfileDbMarker, ScheduleDbMarker, UserDbSpec, WalletDbMarker,
+    InventoryDbMarker, MimicDbMarker, ProfileDbMarker, ScheduleDbMarker, UserDbSpec,
+    WalletDbMarker,
 };
 use chrono::{Duration, Local, NaiveTime};
 use poise::serenity_prelude::UserId;
@@ -189,6 +192,14 @@ impl Data {
         ProfileUser,
         ProfileError,
         ProfileError::NoUserFound
+    );
+    def_db_access!(
+        with_inventory_user_read,
+        with_inventory_user_write,
+        InventoryDbMarker,
+        InventoryUser,
+        InventoryError,
+        InventoryError::NoUserFound
     );
 
     /// Attempt to grant the daily tab reward to a user.

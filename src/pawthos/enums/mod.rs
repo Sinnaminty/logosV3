@@ -10,6 +10,7 @@
 //! |---|---|
 //! | [`color_errors`] | Errors from hex-colour parsing and image generation |
 //! | [`embed_type`] | Controls the accent colour of Discord embeds |
+//! | [`inventory_errors`] | Errors from the shop / inventory sub-system |
 //! | [`mimic_errors`] | Errors from the mimic sub-system |
 //! | [`pawthos_errors`] | Top-level error enum; wraps all others |
 //! | [`persistent_data`] | Messages sent over the persistence channel |
@@ -18,6 +19,7 @@
 
 pub mod color_errors;
 pub mod embed_type;
+pub mod inventory_errors;
 pub mod mimic_errors;
 pub mod pawthos_errors;
 pub mod persistent_data;

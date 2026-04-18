@@ -9,9 +9,10 @@
 //! Feature-specific command groups live in their own sub-modules:
 //! - [`mimic`] — webhook-based persona impersonation.
 //! - [`schedule`] — timezone-aware event reminders.
+//! - [`shop`] — shop catalog, purchases, inventory.
 //! - [`vox`] — DECtalk text-to-speech synthesis.
 
-use crate::commands::{mimic::*, profile::*, schedule::*, vox::*};
+use crate::commands::{mimic::*, profile::*, schedule::*, shop::*, vox::*};
 use crate::pawthos::consts::{
     COLOR_PREVIEW_SIZE, COLOR_ROLE_COST, DAILY_REWARD, FIZZ_ID, LEADERBOARD_SIZE, TAB_EMOJI,
 };
@@ -27,6 +28,7 @@ use poise::serenity_prelude::{self as serenity, EditRole, RoleId, User};
 mod mimic;
 mod profile;
 mod schedule;
+mod shop;
 mod vox;
 
 /// Register all commands with the Poise framework.
@@ -47,6 +49,7 @@ pub fn return_commands() -> Vec<poise::Command<Data, Error>> {
         schedule(),
         color(),
         profile(),
+        shop(),
         leaderboard(),
         fix_color_role_names(),
     ]

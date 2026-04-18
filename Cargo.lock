@@ -1429,6 +1429,7 @@ dependencies = [
  "image",
  "log",
  "poise",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "simple_logger",

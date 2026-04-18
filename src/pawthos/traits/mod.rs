@@ -18,6 +18,7 @@
 
 use crate::pawthos::enums::persistent_data::PersistentData;
 use crate::pawthos::structs::data::Data;
+use crate::pawthos::structs::inventory_user::InventoryUser;
 use crate::pawthos::structs::mimic_user::MimicUser;
 use crate::pawthos::structs::profile_user::ProfileUser;
 use crate::pawthos::structs::schedule_user::ScheduleUser;
@@ -41,6 +42,9 @@ pub struct WalletDbMarker;
 
 /// Marker type that routes generic DB operations to the profile sub-struct.
 pub struct ProfileDbMarker;
+
+/// Marker type that routes generic DB operations to the inventory sub-struct.
+pub struct InventoryDbMarker;
 
 // ---------------------------------------------------------------------------
 // Trait definition
@@ -125,3 +129,4 @@ impl_user_db_spec!(MimicDbMarker, MimicUser, mimic);
 impl_user_db_spec!(ScheduleDbMarker, ScheduleUser, schedule);
 impl_user_db_spec!(WalletDbMarker, WalletUser, wallet);
 impl_user_db_spec!(ProfileDbMarker, ProfileUser, profile);
+impl_user_db_spec!(InventoryDbMarker, InventoryUser, inventory);

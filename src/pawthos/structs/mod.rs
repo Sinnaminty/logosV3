@@ -7,6 +7,7 @@
 //! | Module | Contents |
 //! |---|---|
 //! | [`data`] | [`data::Data`] — the shared state object injected into every command |
+//! | [`inventory_user`] | Per-user shop inventory, unlock flags, interaction stats |
 //! | [`mimic`] | A single [`mimic::Mimic`] definition (name + optional avatar) |
 //! | [`mimic_user`] | Per-user mimic state: active mimic, list, auto-mode, channel overrides |
 //! | [`schedule_event`] | A single [`schedule_event::ScheduleEvent`] with time and timezone |
@@ -17,11 +18,13 @@
 
 pub mod badge;
 pub mod data;
+pub mod inventory_user;
 pub mod mimic;
 pub mod mimic_user;
 pub mod profile_user;
 pub mod schedule_event;
 pub mod schedule_user;
+pub mod shop_catalog;
 pub mod user;
 pub mod user_db;
 pub mod wallet_user;

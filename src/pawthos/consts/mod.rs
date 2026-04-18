@@ -53,3 +53,50 @@ pub const MAX_STREAK_BONUS: i64 = 5;
 
 /// Number of entries shown on the `/leaderboard` embed.
 pub const LEADERBOARD_SIZE: usize = 10;
+
+// ---------------------------------------------------------------------------
+// Shop / inventory
+// ---------------------------------------------------------------------------
+
+/// Extra tabs paid by the sender on top of an item's price when gifting.
+pub const GIFT_FEE: i64 = 2;
+
+/// Maximum number of badges a user may pin to their profile at once.
+pub const MAX_ACTIVE_BADGES: usize = 3;
+
+/// Maximum character length for a user-supplied custom title.
+pub const MAX_CUSTOM_TITLE_LEN: usize = 32;
+
+// ---------------------------------------------------------------------------
+// Tab reaction faucet (Phase 5)
+// ---------------------------------------------------------------------------
+
+/// Probability that any given guild message spawns a faucet bounty.
+///
+/// Combined with [`FAUCET_GLOBAL_COOLDOWN_SECS`] to bound total bounty rate.
+pub const FAUCET_TRIGGER_CHANCE: f64 = 0.005;
+
+/// Tabs awarded to the first user to click the bot's tab reaction.
+pub const FAUCET_REWARD: i64 = 5;
+
+/// Seconds a bounty stays live before the bot removes its reaction.
+pub const FAUCET_EXPIRY_SECS: i64 = 600;
+
+/// Minimum seconds between consecutive bounty spawns, regardless of
+/// [`FAUCET_TRIGGER_CHANCE`] rolls.
+pub const FAUCET_GLOBAL_COOLDOWN_SECS: i64 = 120;
+
+// ---------------------------------------------------------------------------
+// Lootbox tuning (Phase 8)
+// ---------------------------------------------------------------------------
+
+/// Cost per lootbox pull.
+pub const LOOTBOX_COST: i64 = 15;
+
+/// Tabs refunded when a pull would have granted a duplicate badge.
+pub const LOOTBOX_SALVAGE: i64 = 3;
+
+pub const LOOTBOX_CHANCE_COMMON: f64 = 0.60;
+pub const LOOTBOX_CHANCE_UNCOMMON: f64 = 0.25;
+pub const LOOTBOX_CHANCE_RARE: f64 = 0.10;
+pub const LOOTBOX_CHANCE_LEGENDARY: f64 = 0.05;

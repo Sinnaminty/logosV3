@@ -12,6 +12,7 @@
 
 use crate::dectalk::DectalkError;
 use crate::pawthos::enums::color_errors::ColorError;
+use crate::pawthos::enums::inventory_errors::InventoryError;
 use crate::pawthos::enums::mimic_errors::MimicError;
 use crate::pawthos::enums::profile_errors::ProfileError;
 use crate::pawthos::enums::schedule_errors::ScheduleError;
@@ -67,6 +68,10 @@ pub enum PawthosErrors {
     /// An error from the profile sub-system.
     #[error("ProfileError: {0}")]
     Profile(#[from] ProfileError),
+
+    /// An error from the shop / inventory sub-system.
+    #[error("InventoryError: {0}")]
+    Inventory(#[from] InventoryError),
 }
 
 /// Convert a `chrono::ParseError` directly into a `PawthosErrors` by routing
