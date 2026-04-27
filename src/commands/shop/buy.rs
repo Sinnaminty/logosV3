@@ -437,15 +437,8 @@ pub async fn rolecolor(
     // Find or create the user's colour role.
     let member = guild_id.member(ctx.http(), user_id).await?;
     let guild_roles = guild_id.roles(ctx.http()).await?;
-    let existing = member
-        .roles
-        .iter()
-        .filter_map(|r| guild_roles.get(r))
-        .filter(|r| r.name.starts_with('\u{200B}'))
-        .cloned()
-        .next_back();
 
-    if let Some(mut r) = existing {
+    if let Some(mut r) = find_user_flair_role(&member, &guild_roles) {
         r.edit(ctx.http(), EditRole::new().colour(role_color)).await?;
     } else {
         let display = ctx
@@ -504,15 +497,8 @@ pub async fn rolename(
     // Find or create the user's colour role.
     let member = guild_id.member(ctx.http(), user_id).await?;
     let guild_roles = guild_id.roles(ctx.http()).await?;
-    let existing = member
-        .roles
-        .iter()
-        .filter_map(|r| guild_roles.get(r))
-        .filter(|r| r.name.starts_with('\u{200B}'))
-        .cloned()
-        .next_back();
 
-    if let Some(mut r) = existing {
+    if let Some(mut r) = find_user_flair_role(&member, &guild_roles) {
         r.edit(ctx.http(), EditRole::new().name(&role_name)).await?;
     } else {
         let new_role = guild_id
@@ -545,4 +531,48 @@ pub async fn rolename(
         .check_achievements(user_id, ctx.channel_id(), ctx.http())
         .await;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Shared role-resolution
+// ---------------------------------------------------------------------------
+
+/// Find the user's existing "flair" colour role on the current guild.
+///
+/// Preferred: a role whose name starts with `\u{200B}` (the marker convention
+/// applied by `rolecolor` and `rolename` whenever they create or rename a
+/// role). This is fast and unambiguous.
+///
+/// Fallback for pre-convention roles (created manually in the guild UI, or
+/// by an older bot version that didn't use the marker): a *single*
+/// non-managed, non-hoist, non-default-coloured role on the member. The
+/// "single" guard is deliberate — when the user has multiple coloured roles
+/// (e.g., a flair role plus a moderator role), there's no safe heuristic to
+/// pick the right one, so we return `None` and let the caller create a
+/// fresh role rather than silently mutate the wrong one.
+fn find_user_flair_role(
+    member: &serenity::Member,
+    guild_roles: &std::collections::HashMap<serenity::RoleId, serenity::Role>,
+) -> Option<serenity::Role> {
+    if let Some(r) = member
+        .roles
+        .iter()
+        .filter_map(|id| guild_roles.get(id))
+        .filter(|r| r.name.starts_with('\u{200B}'))
+        .cloned()
+        .next_back()
+    {
+        return Some(r);
+    }
+
+    let mut candidates = member
+        .roles
+        .iter()
+        .filter_map(|id| guild_roles.get(id))
+        .filter(|r| !r.managed && !r.hoist && r.colour.0 != 0);
+    let first = candidates.next()?.clone();
+    if candidates.next().is_some() {
+        return None;
+    }
+    Some(first)
 }
