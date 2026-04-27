@@ -4,6 +4,8 @@ Phased blueprint for implementing the `/shop` suite plus supporting systems (inv
 
 Companion to `SHOP_IDEAS.md`. Read that first for the design intent; this doc covers *how* to build it.
 
+> **⚠ Phase 4 superseded.** The curated banner catalog plan in §"Phase 4" was scrapped. Banners are now user-supplied and charge per-set; the same per-set model applies to custom hex colorways. The `/color set` flow moved into `/shop buy rolecolor` and `/shop buy rolename`. See **`BANNER_AND_ROLE_REFACTOR.md`** for the resolved plan and decisions. Sections of this doc that reference `BannerDef`, `BANNERS`, `unlocked_custom_banner`, `unlocked_custom_colorway`, `owned_banners`, `active_banner_id`, `/profile set namedbanner`, `/shop buy banner`, `/shop gift banner`, `/shop buy unlock unlock_custom_banner`, or the GitHub-Pages banner hosting setup are kept as historical record only.
+
 ---
 
 ## Scope
@@ -414,6 +416,8 @@ Revert; re-enable free colorway access. Previously-bought colorways remain in JS
 ---
 
 ## Phase 4: Paywall banners + GitHub hosting
+
+> **Superseded.** This phase was not implemented as designed. Banners are now user-supplied (URL or attachment) and charge `BANNER_SET_COST` tabs every time a user calls `/profile set banner` with a non-empty value. The curated catalog and GitHub-Pages hosting are gone. The replacement is described in `BANNER_AND_ROLE_REFACTOR.md`. Everything below is historical record.
 
 Same shape as Phase 3 but with hosted images. See the **GitHub Pages Setup** section below for URL generation.
 

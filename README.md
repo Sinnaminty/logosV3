@@ -10,9 +10,9 @@ A Discord bot written in Rust. Third rewrite of a passion project — this time 
 |---|---|
 | `/mimic` | Create named personas (name + avatar). Talk as them via Discord webhooks. Enable auto-mode to have every message you send automatically re-posted as your active mimic. |
 | `/schedule` | Add timezone-aware events with date and time. The bot DMs you a reminder when the event arrives. Reminders survive bot restarts. |
-| `/profile` | View and customise a profile card with bio, banner, colorway, equipped title, and badges. Custom values are paywall-gated; named cosmetics are bought from the shop. |
-| `/shop` | `browse` the catalog, view your `inventory`, `buy` titles / colorways / banners / unlocks / lootboxes, or `gift` cosmetics to other users. |
-| `/color` | Preview a hex colour as a 256×256 PNG swatch, or spend 10 tabs to buy a custom colour role. |
+| `/profile` | View and customise a profile card with bio, banner, colorway, equipped title, and badges. Custom banner and custom hex colorway charge tabs every time you set them; equipping an owned named colorway is free. Custom title is a one-time unlock. |
+| `/shop` | `browse` the catalog, view your `inventory`, `buy` titles / colorways / unlocks / lootboxes, change your custom-role colour or name (`buy rolecolor`, `buy rolename`), or `gift` cosmetics to other users. |
+| `/color preview` | Preview a hex colour as a 256×256 PNG swatch (free). |
 | `/daily` | Claim 10 tabs once every 24 hours. Consecutive days build a streak that adds up to +5 bonus tabs. |
 | `/balance` | Check your tab balance. |
 | `/leaderboard` | Top tab-holders in the guild. |
@@ -109,13 +109,14 @@ src/
 │   │   └── mod.rs      # /schedule add, list, delete, set_tz
 │   ├── profile/
 │   │   ├── mod.rs      # /profile view (parent registers set + unset)
-│   │   ├── set.rs      # /profile set bio, banner, namedbanner, colorway,
-│   │   │               #   namedcolorway, title, customtitle, badges
+│   │   ├── set.rs      # /profile set bio, banner, colorway, namedcolorway,
+│   │   │               #   title, customtitle, badges
 │   │   └── unset.rs    # /profile unset title, colorway, banner, badges
 │   └── shop/
 │       ├── mod.rs      # /shop browse, /shop inventory (parent registers buy + gift)
-│       ├── buy.rs      # /shop buy title, colorway, banner, unlock, lootbox
-│       └── gift.rs     # /shop gift title, colorway, banner
+│       ├── buy.rs      # /shop buy title, colorway, unlock, lootbox,
+│       │               #   rolecolor, rolename
+│       └── gift.rs     # /shop gift title, colorway
 └── pawthos/            # Core domain — all data structures and logic
     ├── mod.rs
     ├── consts/         # Magic numbers and strings (costs, colours, emoji, faucet
@@ -140,9 +141,15 @@ Every write automatically snapshots the database and sends it to the persistence
 
 ### Shop catalog
 
-The shop catalogue (titles, colorways, banners, badges, achievements, unlock items) lives in `pawthos/structs/shop_catalog.rs` as `const` arrays. Each entry has a stable string ID; `InventoryUser` stores those IDs in `Vec<String>` collections, and `ProfileUser` stores the IDs of currently equipped items. **Catalog IDs are persisted data** — renaming one is a migration, not a refactor.
+The shop catalogue (titles, named colorways, badges, achievements, the custom-title unlock) lives in `pawthos/structs/shop_catalog.rs` as `const` arrays. Each entry has a stable string ID; `InventoryUser` stores those IDs in `Vec<String>` collections, and `ProfileUser` stores the IDs of currently equipped items. **Catalog IDs are persisted data** — renaming one is a migration, not a refactor.
 
-Custom values on `ProfileUser` (`bio`, custom hex `colorway`, custom `banner_url`, custom title text) are gated by paywall flags on `InventoryUser` (`unlocked_custom_*`).
+Three things charge tabs but never produce a catalog item:
+
+- **`/profile set banner <url|attachment>`** — `BANNER_SET_COST` tabs per call. Banners are user-supplied; there is no banner catalog.
+- **`/profile set colorway <hex>`** — `CUSTOM_COLORWAY_SET_COST` tabs per call. Equipping an owned named colorway via `/profile set namedcolorway` is free.
+- **`/shop buy rolecolor <hex>`** / **`/shop buy rolename <text>`** — `ROLE_COLOR_COST` / `ROLE_NAME_COST` tabs per call. Manage the user's zero-width-space-prefixed colour role on the current guild.
+
+Custom title text is the only remaining one-time unlock (`unlocked_custom_title`).
 
 ### Persistence
 
@@ -164,7 +171,9 @@ The same `Message` handler rolls a per-message chance (`FAUCET_TRIGGER_CHANCE` i
 
 ## Roadmap
 
-The shop is an in-flight expansion. **`SHOP_PLAN.md`** is the phased blueprint (Phases 0–8); **`SHOP_IDEAS.md`** is the design intent. Phases 0–3 and 5–8 have landed; Phase 4 (paywall banners with hosted images) is the explicit pending hole — `BANNERS: &[BannerDef] = &[]` in `shop_catalog.rs`.
+The shop is an in-flight expansion. **`SHOP_PLAN.md`** is the phased blueprint (Phases 0–8); **`SHOP_IDEAS.md`** is the design intent.
+
+Phase 4 (curated banner catalog) was scrapped in favour of user-supplied banners with a per-set tab charge. The `/color set` flow likewise moved into `/shop buy rolecolor` and `/shop buy rolename`. See **`BANNER_AND_ROLE_REFACTOR.md`** for the full refactor plan and decisions.
 
 ---
 
