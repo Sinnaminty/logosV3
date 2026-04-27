@@ -17,8 +17,10 @@
 use crate::pawthos::{
     consts::{
         LOOTBOX_CHANCE_COMMON, LOOTBOX_CHANCE_LEGENDARY, LOOTBOX_CHANCE_RARE,
-        LOOTBOX_CHANCE_UNCOMMON, LOOTBOX_COST, LOOTBOX_SALVAGE, TAB_EMOJI,
+        LOOTBOX_CHANCE_UNCOMMON, LOOTBOX_COST, LOOTBOX_SALVAGE, ROLE_COLOR_COST,
+        ROLE_NAME_COST, TAB_EMOJI,
     },
+    enums::color_errors::ColorError,
     enums::inventory_errors::InventoryError,
     structs::shop_catalog::{
         self, BadgeDef, COLORWAYS, LOOTBOX_POOL, Rarity, TITLES, UNLOCKS,
@@ -26,13 +28,17 @@ use crate::pawthos::{
     types::{Context, Result},
 };
 use crate::utils;
-use poise::serenity_prelude::AutocompleteChoice;
+use poise::serenity_prelude::{self as serenity, AutocompleteChoice, EditRole};
 use rand::Rng;
 
 /// Shop purchase subcommands.
+///
+/// `rolecolor` and `rolename` are per-use cosmetics — they don't grant an
+/// inventory item, they spend tabs to apply a change to your custom colour
+/// role on the current guild. Each call charges separately.
 #[poise::command(
     slash_command,
-    subcommands("title", "colorway", "unlock", "lootbox")
+    subcommands("title", "colorway", "unlock", "lootbox", "rolecolor", "rolename")
 )]
 pub async fn buy(_ctx: Context<'_>) -> Result {
     Ok(())
@@ -387,4 +393,156 @@ fn odds_for(r: Rarity) -> f64 {
         Rarity::Legendary => LOOTBOX_CHANCE_LEGENDARY,
         Rarity::Achievement => 0.0,
     }
+}
+
+// ---------------------------------------------------------------------------
+// Per-use role cosmetics
+// ---------------------------------------------------------------------------
+//
+// Custom colour roles are identified by a leading zero-width space (`\u{200B}`)
+// in their name, which keeps them distinct from normal server roles. Both
+// commands find the user's existing colour role via that prefix; if no such
+// role exists, they create one using a sensible default for the field they
+// don't touch (display name on rolecolor, no colour on rolename).
+//
+// Discord API work happens **before** any tab charge so a permission failure
+// or rate-limit on Discord's side never costs the user tabs.
+
+/// Change the colour of your custom colour role. Charged
+/// [`ROLE_COLOR_COST`] tabs every call.
+///
+/// Accepts bare hex (`FF8800`) or `0x`-prefixed (`0xFF8800`). If you don't
+/// have a colour role yet, one is created for you (named after your display
+/// name) and assigned. **Special case:** `#000000` is silently mapped to
+/// `rgb(1, 1, 1)` because Discord renders role colour `0` as the default
+/// text colour rather than black.
+#[poise::command(slash_command, guild_only)]
+pub async fn rolecolor(
+    ctx: Context<'_>,
+    #[description = "Hex code (e.g. FF8800 or 0xFF8800)"] color: String,
+) -> Result {
+    let user_id = ctx.author().id;
+    let guild_id = ctx.guild_id().unwrap();
+
+    // Validate before doing any I/O.
+    let trimmed = color.strip_prefix("0x").unwrap_or(&color);
+    let color_int =
+        u32::from_str_radix(trimmed, 16).map_err(|_| ColorError::IncorrectFormat)?;
+    let role_color = if color_int == 0 {
+        serenity::Colour::from_rgb(1, 1, 1)
+    } else {
+        serenity::Colour::new(color_int)
+    };
+
+    // Find or create the user's colour role.
+    let member = guild_id.member(ctx.http(), user_id).await?;
+    let guild_roles = guild_id.roles(ctx.http()).await?;
+    let existing = member
+        .roles
+        .iter()
+        .filter_map(|r| guild_roles.get(r))
+        .filter(|r| r.name.starts_with('\u{200B}'))
+        .cloned()
+        .next_back();
+
+    if let Some(mut r) = existing {
+        r.edit(ctx.http(), EditRole::new().colour(role_color)).await?;
+    } else {
+        let display = ctx
+            .author()
+            .global_name
+            .clone()
+            .unwrap_or_else(|| ctx.author().name.clone());
+        let role_name = format!("\u{200B}{display}");
+        let new_role = guild_id
+            .create_role(ctx.http(), EditRole::new().colour(role_color).name(role_name))
+            .await?;
+        member.add_role(ctx.http(), new_role.id).await?;
+    }
+
+    // Charge after Discord API success.
+    let tabs = ctx
+        .data()
+        .with_wallet_user_write(user_id, |w| w.remove_tabs(ROLE_COLOR_COST))
+        .await?;
+    ctx.data()
+        .with_inventory_user_write(user_id, |inv| {
+            inv.tabs_spent_lifetime = inv.tabs_spent_lifetime.saturating_add(ROLE_COLOR_COST);
+            Ok(())
+        })
+        .await?;
+
+    ctx.send(utils::reply_ok(
+        "Shop Buy Role Color",
+        format!(
+            "Your role colour is now `#{trimmed}` for **{ROLE_COLOR_COST} {TAB_EMOJI}**. Balance: **{tabs} {TAB_EMOJI}**.",
+        ),
+    ))
+    .await?;
+
+    ctx.data()
+        .check_achievements(user_id, ctx.channel_id(), ctx.http())
+        .await;
+    Ok(())
+}
+
+/// Rename your custom colour role. Charged [`ROLE_NAME_COST`] tabs every call.
+///
+/// If you don't have a colour role yet, one is created with the given name
+/// and no colour (use `/shop buy rolecolor` afterwards to set one).
+#[poise::command(slash_command, guild_only)]
+pub async fn rolename(
+    ctx: Context<'_>,
+    #[description = "New name for your role"] name: String,
+) -> Result {
+    let user_id = ctx.author().id;
+    let guild_id = ctx.guild_id().unwrap();
+
+    // Zero-width-space prefix marks this as a managed colour role.
+    let role_name = format!("\u{200B}{name}");
+
+    // Find or create the user's colour role.
+    let member = guild_id.member(ctx.http(), user_id).await?;
+    let guild_roles = guild_id.roles(ctx.http()).await?;
+    let existing = member
+        .roles
+        .iter()
+        .filter_map(|r| guild_roles.get(r))
+        .filter(|r| r.name.starts_with('\u{200B}'))
+        .cloned()
+        .next_back();
+
+    if let Some(mut r) = existing {
+        r.edit(ctx.http(), EditRole::new().name(&role_name)).await?;
+    } else {
+        let new_role = guild_id
+            .create_role(ctx.http(), EditRole::new().name(&role_name))
+            .await?;
+        member.add_role(ctx.http(), new_role.id).await?;
+    }
+
+    // Charge after Discord API success.
+    let tabs = ctx
+        .data()
+        .with_wallet_user_write(user_id, |w| w.remove_tabs(ROLE_NAME_COST))
+        .await?;
+    ctx.data()
+        .with_inventory_user_write(user_id, |inv| {
+            inv.tabs_spent_lifetime = inv.tabs_spent_lifetime.saturating_add(ROLE_NAME_COST);
+            Ok(())
+        })
+        .await?;
+
+    ctx.send(utils::reply_ok(
+        "Shop Buy Role Name",
+        format!(
+            "Your role name is now **{name}** for **{ROLE_NAME_COST} {TAB_EMOJI}**. Balance: **{tabs} {TAB_EMOJI}**.",
+        ),
+    ))
+    .await?;
+
+    ctx.data()
+        .check_achievements(user_id, ctx.channel_id(), ctx.http())
+        .await;
+    Ok(())
 }

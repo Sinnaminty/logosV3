@@ -3,7 +3,9 @@
 //! This module owns:
 //! - [`return_commands`] — the list of all commands registered with the framework.
 //! - Utility commands: `help`, `pfp`, `daily`, `balance`.
-//! - The `/color` command group (`preview` + `set`).
+//! - The `/color preview` command (free hex preview swatch). Paid role
+//!   colour and name changes live in `/shop buy rolecolor` and
+//!   `/shop buy rolename`.
 //! - Admin prefix commands (`register`, `give_tabs`, `fix_color_role_names`).
 //!
 //! Feature-specific command groups live in their own sub-modules:
@@ -14,7 +16,7 @@
 
 use crate::commands::{mimic::*, profile::*, schedule::*, shop::*, vox::*};
 use crate::pawthos::consts::{
-    COLOR_PREVIEW_SIZE, ROLE_COLOR_COST, DAILY_REWARD, FIZZ_ID, LEADERBOARD_SIZE, TAB_EMOJI,
+    COLOR_PREVIEW_SIZE, DAILY_REWARD, FIZZ_ID, LEADERBOARD_SIZE, TAB_EMOJI,
 };
 use crate::pawthos::enums::color_errors::ColorError;
 use crate::pawthos::structs::shop_catalog::ACHIEVEMENTS;
@@ -262,8 +264,8 @@ pub async fn achievements(ctx: Context<'_>) -> Result {
 // Color commands
 // ---------------------------------------------------------------------------
 
-/// Colour-related commands: preview a hex colour, or purchase a custom role.
-#[poise::command(slash_command, subcommands("preview", "set"))]
+/// Colour-related commands. Paid role manipulation lives under `/shop buy`.
+#[poise::command(slash_command, subcommands("preview"))]
 pub async fn color(_ctx: Context<'_>) -> Result {
     Ok(())
 }
@@ -272,7 +274,7 @@ pub async fn color(_ctx: Context<'_>) -> Result {
 ///
 /// Accepts bare hex (`FF8800`) or `0x`-prefixed (`0xFF8800`). The image is
 /// attached directly to the response so you can see the exact colour before
-/// committing to buying a role with it.
+/// committing to a role-colour change with `/shop buy rolecolor`.
 #[poise::command(slash_command)]
 pub async fn preview(
     ctx: Context<'_>,
@@ -302,8 +304,6 @@ pub async fn preview(
     let filename = "color.png";
     let attachment = serenity::CreateAttachment::bytes(png_bytes, filename);
 
-    // TODO: meow~
-
     ctx.send(
         poise::CreateReply::default().attachment(attachment).embed(
             serenity::CreateEmbed::default()
@@ -312,86 +312,6 @@ pub async fn preview(
                 .color(color),
         ),
     )
-    .await?;
-
-    Ok(())
-}
-
-/// Set your custom colour role name and colour for [`ROLE_COLOR_COST`] tabs.
-///
-/// Custom roles are identified by a leading zero-width space (`\u{200B}`) in
-/// their name, which keeps them distinct from normal server roles. If you
-/// already have a colour role it is updated in-place; otherwise a new role is
-/// created and assigned to you.
-///
-/// The tab charge only happens *after* the Discord API calls succeed, so a
-/// failed role creation never costs you tabs.
-///
-/// **Special case:** a colour value of `#000000` (pure black) is silently
-/// converted to `rgb(1, 1, 1)` because Discord treats role colour `0` as
-/// "no colour" and renders it as the default text colour instead of black.
-#[poise::command(slash_command, guild_only)]
-pub async fn set(
-    ctx: Context<'_>,
-    #[description = "Name of your role."] name: String,
-    #[description = "Color of your role."] color: String,
-) -> Result {
-    let user_id = ctx.author().id;
-    let guild_id = ctx.guild_id().unwrap();
-    // rebinding name with zero-width
-    let name = '\u{200B}'.to_string() + &name;
-
-    log::debug!("inputted name: {name}");
-
-    let trimmed = color.strip_prefix("0x").unwrap_or(&color);
-
-    let color_integer =
-        u32::from_str_radix(trimmed, 16).map_err(|_| ColorError::IncorrectFormat)?;
-
-    let color = if color_integer == 0 {
-        poise::serenity_prelude::Colour::from_rgb(1, 1, 1)
-    } else {
-        poise::serenity_prelude::Colour::new(color_integer)
-    };
-
-    // Do all guild API work first — only charge tabs on success.
-    let member = guild_id.member(ctx.http(), user_id).await?;
-    let member_role_ids = member.roles.clone();
-    let guild_roles = guild_id.roles(ctx.http()).await?;
-    let member_roles = member_role_ids
-        .iter()
-        .filter_map(|r| guild_roles.get(r))
-        .collect::<Vec<_>>();
-
-    // right.. so let's try to use a zero-width space to determine if this is a color role or not.
-    if let Some(mut r) = member_roles
-        .into_iter()
-        .filter(|r| r.name.starts_with('\u{200B}'))
-        .cloned()
-        .next_back()
-    {
-        log::debug!("role already exists! {}", r.name);
-        r.edit(ctx.http(), EditRole::new().colour(color).name(&name))
-            .await?;
-    } else {
-        //ok.. we need to create a role.
-        let r = guild_id
-            .create_role(ctx.http(), EditRole::new().colour(color).name(name))
-            .await?;
-        log::debug!("makin new role! {}", r.name);
-
-        member.add_role(ctx.http(), r.id).await?;
-    }
-
-    let tabs = ctx
-        .data()
-        .with_wallet_user_write(user_id, |user| user.remove_tabs(ROLE_COLOR_COST))
-        .await?;
-
-    ctx.send(utils::reply_ok(
-        "Set Color",
-        format!("Your color has been set! You now have **{tabs} {TAB_EMOJI}!**"),
-    ))
     .await?;
 
     Ok(())
