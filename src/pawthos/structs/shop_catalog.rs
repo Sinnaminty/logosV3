@@ -7,15 +7,17 @@
 //! # Layout
 //!
 //! Items are split across typed tables so each category can carry the extra
-//! data it needs (colorways carry hex values, banners carry URLs, lootbox
-//! badges carry emoji strings). All tables share the common [`ShopItem`]
-//! header, so [`lookup`] can find any item by ID regardless of category.
+//! data it needs (colorways carry hex values, lootbox badges carry emoji
+//! strings). All tables share the common [`ShopItem`] header, so [`lookup`]
+//! can find any item by ID regardless of category.
+//!
+//! Banners are user-supplied (URL or attachment) only — there is no curated
+//! banner catalog. See `/profile set banner` for the per-set charge model.
 //!
 //! # ID conventions
 //!
 //! - `title_*`         — titles
 //! - `colorway_*`      — named colorways
-//! - `banner_*`        — named banners
 //! - `unlock_*`        — one-time paywall unlocks
 //! - `box_*`           — lootbox-pool badges (Phase 8)
 //! - `ach_*`           — achievement badges (Phase 7)
@@ -45,9 +47,8 @@ pub enum Rarity {
 pub enum Category {
     Title,
     Colorway,
-    Banner,
     Badge,
-    /// One-time paywall unlock (custom title, custom colorway, custom banner).
+    /// One-time paywall unlock (currently only the custom-title unlock).
     Unlock,
     /// Lootbox pull service — buying one rolls a random badge.
     Lootbox,
@@ -78,13 +79,6 @@ pub struct ColorwayDef {
     pub item: ShopItem,
     /// 24-bit RGB colour value (`0xRRGGBB`).
     pub hex: u32,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct BannerDef {
-    pub item: ShopItem,
-    /// Absolute image URL.
-    pub url: &'static str,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -185,11 +179,6 @@ pub const COLORWAYS: &[ColorwayDef] = &[
         cost: 20, category: Category::Colorway, rarity: Rarity::Common,
     }, hex: 0x98D8A1 },
 ];
-
-/// Named banners — Phase 4 will fill this in once the image catalog and
-/// hosting are finalised. Kept empty for now so `/shop browse` hides the
-/// section until content exists.
-pub const BANNERS: &[BannerDef] = &[];
 
 /// Lootbox pull pool.
 ///
@@ -294,20 +283,14 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
 ];
 
 /// One-time paywall unlocks — 30 tabs each.
+///
+/// Custom colorway and custom banner are no longer one-time unlocks; they
+/// charge per-set in `/profile set colorway|banner`. Only the custom title
+/// remains an unlock because the title text is stored once and reused.
 pub const UNLOCKS: &[ShopItem] = &[
     ShopItem {
         id: "unlock_custom_title", name: "Custom Title Unlock",
         description: "Enables `/profile set customtitle <text>` (up to 32 chars).",
-        cost: 30, category: Category::Unlock, rarity: Rarity::Uncommon,
-    },
-    ShopItem {
-        id: "unlock_custom_colorway", name: "Custom Colorway Unlock",
-        description: "Enables `/profile set colorway <hex>` with any 24-bit colour.",
-        cost: 30, category: Category::Unlock, rarity: Rarity::Uncommon,
-    },
-    ShopItem {
-        id: "unlock_custom_banner", name: "Custom Banner Unlock",
-        description: "Enables `/profile set banner <url|attachment>`.",
         cost: 30, category: Category::Unlock, rarity: Rarity::Uncommon,
     },
 ];
@@ -331,7 +314,6 @@ pub const LOOTBOX_ITEM: ShopItem = ShopItem {
 pub fn lookup(id: &str) -> Option<&'static ShopItem> {
     TITLES.iter().map(|t| &t.item)
         .chain(COLORWAYS.iter().map(|c| &c.item))
-        .chain(BANNERS.iter().map(|b| &b.item))
         .chain(LOOTBOX_POOL.iter().map(|b| &b.item))
         .chain(UNLOCKS.iter())
         .chain(std::iter::once(&LOOTBOX_ITEM))
@@ -346,11 +328,6 @@ pub fn lookup_title(id: &str) -> Option<&'static TitleDef> {
 /// Find a colorway by ID.
 pub fn lookup_colorway(id: &str) -> Option<&'static ColorwayDef> {
     COLORWAYS.iter().find(|c| c.item.id == id)
-}
-
-/// Find a banner by ID.
-pub fn lookup_banner(id: &str) -> Option<&'static BannerDef> {
-    BANNERS.iter().find(|b| b.item.id == id)
 }
 
 /// Find a badge (from the lootbox pool) by ID.

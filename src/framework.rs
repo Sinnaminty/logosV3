@@ -85,38 +85,12 @@ fn load_user_db() -> UserDB {
 /// Called once right after [`load_user_db`]. Every rule checks its "is this
 /// already migrated?" condition first so re-running on every startup is safe.
 ///
-/// # Current migrations
-///
-/// - **Grandfather custom colorway unlock** (Phase 3): if a user already has
-///   a custom colorway set but no inventory entry records the unlock, flip
-///   the flag so they don't lose access to `/profile set colorway`.
-/// - **Grandfather custom banner unlock** (Phase 4): analogous for banner.
-fn run_migrations(user_db: &mut UserDB) {
-    let mut colorway_grandfathered = 0u32;
-    let mut banner_grandfathered = 0u32;
-
-    for user in user_db.db.values_mut() {
-        if user.profile.colorway.is_some() && !user.inventory.unlocked_custom_colorway {
-            user.inventory.unlocked_custom_colorway = true;
-            colorway_grandfathered += 1;
-        }
-        if user.profile.banner_url.is_some() && !user.inventory.unlocked_custom_banner {
-            user.inventory.unlocked_custom_banner = true;
-            banner_grandfathered += 1;
-        }
-    }
-
-    if colorway_grandfathered > 0 {
-        log::info!(
-            "Migration: grandfathered {colorway_grandfathered} custom colorway unlock(s)",
-        );
-    }
-    if banner_grandfathered > 0 {
-        log::info!(
-            "Migration: grandfathered {banner_grandfathered} custom banner unlock(s)",
-        );
-    }
-}
+/// Currently a no-op — the prior banner/colorway unlock grandfathering was
+/// removed when those features moved to a per-set charge model. Stale
+/// `unlocked_custom_banner` / `unlocked_custom_colorway` / `owned_banners` /
+/// `active_banner_id` fields in old `user.json` snapshots are silently
+/// dropped by serde (no `deny_unknown_fields` on these structs).
+fn run_migrations(_user_db: &mut UserDB) {}
 
 // ---------------------------------------------------------------------------
 // Wallet list (daily claim tracking)

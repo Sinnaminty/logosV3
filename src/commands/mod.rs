@@ -14,7 +14,7 @@
 
 use crate::commands::{mimic::*, profile::*, schedule::*, shop::*, vox::*};
 use crate::pawthos::consts::{
-    COLOR_PREVIEW_SIZE, COLOR_ROLE_COST, DAILY_REWARD, FIZZ_ID, LEADERBOARD_SIZE, TAB_EMOJI,
+    COLOR_PREVIEW_SIZE, ROLE_COLOR_COST, DAILY_REWARD, FIZZ_ID, LEADERBOARD_SIZE, TAB_EMOJI,
 };
 use crate::pawthos::enums::color_errors::ColorError;
 use crate::pawthos::structs::shop_catalog::ACHIEVEMENTS;
@@ -317,7 +317,7 @@ pub async fn preview(
     Ok(())
 }
 
-/// Set your custom colour role name and colour for [`COLOR_ROLE_COST`] tabs.
+/// Set your custom colour role name and colour for [`ROLE_COLOR_COST`] tabs.
 ///
 /// Custom roles are identified by a leading zero-width space (`\u{200B}`) in
 /// their name, which keeps them distinct from normal server roles. If you
@@ -385,7 +385,7 @@ pub async fn set(
 
     let tabs = ctx
         .data()
-        .with_wallet_user_write(user_id, |user| user.remove_tabs(COLOR_ROLE_COST))
+        .with_wallet_user_write(user_id, |user| user.remove_tabs(ROLE_COLOR_COST))
         .await?;
 
     ctx.send(utils::reply_ok(

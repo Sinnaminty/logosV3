@@ -37,8 +37,23 @@ pub const FIZZ_ID: serenity::UserId = serenity::UserId::new(326389428593623040);
 /// Number of tabs awarded by the `/daily` command.
 pub const DAILY_REWARD: i64 = 10;
 
-/// Cost in tabs to set or change a custom colour role via `/color set`.
-pub const COLOR_ROLE_COST: i64 = 10;
+/// Cost in tabs to change the colour of your custom role via
+/// `/shop buy rolecolor <hex>`. Charged every call.
+pub const ROLE_COLOR_COST: i64 = 10;
+
+/// Cost in tabs to change the name of your custom role via
+/// `/shop buy rolename <text>`. Charged every call.
+pub const ROLE_NAME_COST: i64 = 10;
+
+/// Cost in tabs to set a custom hex colorway on your profile via
+/// `/profile set colorway <hex>`. Charged every call. Equipping a named
+/// colorway you already own is free.
+pub const CUSTOM_COLORWAY_SET_COST: i64 = 5;
+
+/// Cost in tabs to set a custom banner on your profile via
+/// `/profile set banner <url|attachment>`. Charged every call. Clearing
+/// (no url and no attachment) is free.
+pub const BANNER_SET_COST: i64 = 10;
 
 /// The Discord custom-emoji string for the "tab" currency emoji.
 ///

@@ -20,13 +20,13 @@
 use crate::pawthos::{
     consts::{GIFT_FEE, TAB_EMOJI},
     enums::inventory_errors::InventoryError,
-    structs::shop_catalog::{self, BANNERS, COLORWAYS, TITLES},
+    structs::shop_catalog::{self, COLORWAYS, TITLES},
     types::{Context, Result},
 };
 use poise::serenity_prelude::{self as serenity, AutocompleteChoice};
 
 /// Gift a shop item to another user.
-#[poise::command(slash_command, subcommands("title", "colorway", "banner"))]
+#[poise::command(slash_command, subcommands("title", "colorway"))]
 pub async fn gift(_ctx: Context<'_>) -> Result {
     Ok(())
 }
@@ -85,35 +85,6 @@ pub async fn colorway(
         inv.owned_colorways.iter().any(|c| c == id)
     }, |inv, id| {
         inv.owned_colorways.push(id.to_string());
-    })
-    .await
-}
-
-/// Gift a named banner to another user.
-#[poise::command(slash_command)]
-pub async fn banner(
-    ctx: Context<'_>,
-    #[description = "Who to gift"] recipient: serenity::User,
-    #[description = "Which banner"]
-    #[autocomplete = "giftable_banners"]
-    id: String,
-) -> Result {
-    let def = shop_catalog::lookup_banner(&id)
-        .ok_or_else(|| InventoryError::UnknownItem(id.clone()))?;
-
-    let gift_context = GiftContext {
-        sender: ctx.author(),
-        recipient: &recipient,
-        item_id: id.clone(),
-        item_name: def.item.name.to_string(),
-        item_cost: def.item.cost,
-        category_label: "Banner",
-    };
-
-    perform_gift(ctx, gift_context, |inv, id| {
-        inv.owned_banners.iter().any(|b| b == id)
-    }, |inv, id| {
-        inv.owned_banners.push(id.to_string());
     })
     .await
 }
@@ -240,17 +211,5 @@ async fn giftable_colorways(_ctx: Context<'_>, partial: &str) -> Vec<Autocomplet
         })
         .take(25)
         .map(|c| AutocompleteChoice::new(c.item.name.to_string(), c.item.id.to_string()))
-        .collect()
-}
-
-async fn giftable_banners(_ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
-    let p = partial.to_lowercase();
-    BANNERS
-        .iter()
-        .filter(|b| {
-            b.item.name.to_lowercase().contains(&p) || b.item.id.to_lowercase().contains(&p)
-        })
-        .take(25)
-        .map(|b| AutocompleteChoice::new(b.item.name.to_string(), b.item.id.to_string()))
         .collect()
 }

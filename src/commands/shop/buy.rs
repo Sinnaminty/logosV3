@@ -21,7 +21,7 @@ use crate::pawthos::{
     },
     enums::inventory_errors::InventoryError,
     structs::shop_catalog::{
-        self, BadgeDef, Rarity, BANNERS, COLORWAYS, LOOTBOX_POOL, TITLES, UNLOCKS,
+        self, BadgeDef, COLORWAYS, LOOTBOX_POOL, Rarity, TITLES, UNLOCKS,
     },
     types::{Context, Result},
 };
@@ -32,7 +32,7 @@ use rand::Rng;
 /// Shop purchase subcommands.
 #[poise::command(
     slash_command,
-    subcommands("title", "colorway", "banner", "unlock", "lootbox")
+    subcommands("title", "colorway", "unlock", "lootbox")
 )]
 pub async fn buy(_ctx: Context<'_>) -> Result {
     Ok(())
@@ -143,58 +143,7 @@ pub async fn colorway(
     Ok(())
 }
 
-/// Buy a named banner. Equip with `/profile set namedbanner <id>`.
-#[poise::command(slash_command)]
-pub async fn banner(
-    ctx: Context<'_>,
-    #[description = "Which banner to buy"]
-    #[autocomplete = "buyable_banners"]
-    id: String,
-) -> Result {
-    let def = shop_catalog::lookup_banner(&id)
-        .ok_or_else(|| InventoryError::UnknownItem(id.clone()))?;
-
-    let user_id = ctx.author().id;
-
-    let already = ctx
-        .data()
-        .with_inventory_user_read(user_id, |inv| {
-            Ok(inv.owned_banners.iter().any(|b| b == &id))
-        })
-        .await
-        .unwrap_or(false);
-    if already {
-        return Err(InventoryError::AlreadyOwned(def.item.name.to_string()).into());
-    }
-
-    ctx.data()
-        .with_wallet_user_write(user_id, |w| w.remove_tabs(def.item.cost))
-        .await?;
-
-    ctx.data()
-        .with_inventory_user_write(user_id, |inv| {
-            inv.owned_banners.push(id.clone());
-            inv.tabs_spent_lifetime += def.item.cost;
-            Ok(())
-        })
-        .await?;
-
-    ctx.send(utils::reply_ok(
-        "Shop Buy Banner",
-        format!(
-            "You bought **{}** for **{} {TAB_EMOJI}**!\nEquip it with `/profile set namedbanner {}`.",
-            def.item.name, def.item.cost, def.item.id,
-        ),
-    ))
-    .await?;
-
-    ctx.data()
-        .check_achievements(user_id, ctx.channel_id(), ctx.http())
-        .await;
-    Ok(())
-}
-
-/// Buy a one-time unlock (custom title, colorway, or banner).
+/// Buy a one-time unlock. Currently only the custom-title unlock exists.
 #[poise::command(slash_command)]
 pub async fn unlock(
     ctx: Context<'_>,
@@ -214,8 +163,6 @@ pub async fn unlock(
         .with_inventory_user_read(user_id, |inv| {
             Ok(match id.as_str() {
                 "unlock_custom_title" => inv.unlocked_custom_title,
-                "unlock_custom_colorway" => inv.unlocked_custom_colorway,
-                "unlock_custom_banner" => inv.unlocked_custom_banner,
                 _ => false,
             })
         })
@@ -231,11 +178,8 @@ pub async fn unlock(
 
     ctx.data()
         .with_inventory_user_write(user_id, |inv| {
-            match id.as_str() {
-                "unlock_custom_title" => inv.unlocked_custom_title = true,
-                "unlock_custom_colorway" => inv.unlocked_custom_colorway = true,
-                "unlock_custom_banner" => inv.unlocked_custom_banner = true,
-                _ => {}
+            if id.as_str() == "unlock_custom_title" {
+                inv.unlocked_custom_title = true;
             }
             inv.tabs_spent_lifetime += item.cost;
             Ok(())
@@ -244,8 +188,6 @@ pub async fn unlock(
 
     let next_step = match id.as_str() {
         "unlock_custom_title" => "Set one with `/profile set customtitle <text>`.",
-        "unlock_custom_colorway" => "Set one with `/profile set colorway <hex>`.",
-        "unlock_custom_banner" => "Set one with `/profile set banner <url|attachment>`.",
         _ => "",
     };
 
@@ -299,18 +241,6 @@ async fn buyable_colorways(_ctx: Context<'_>, partial: &str) -> Vec<Autocomplete
         })
         .take(25)
         .map(|c| AutocompleteChoice::new(c.item.name.to_string(), c.item.id.to_string()))
-        .collect()
-}
-
-async fn buyable_banners(_ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
-    let p = partial.to_lowercase();
-    BANNERS
-        .iter()
-        .filter(|b| {
-            b.item.name.to_lowercase().contains(&p) || b.item.id.to_lowercase().contains(&p)
-        })
-        .take(25)
-        .map(|b| AutocompleteChoice::new(b.item.name.to_string(), b.item.id.to_string()))
         .collect()
 }
 

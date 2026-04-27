@@ -36,18 +36,20 @@ pub struct ProfileUser {
 
     /// URL of a custom banner image shown at the bottom of the profile embed.
     ///
-    /// Gated by
-    /// [`crate::pawthos::structs::inventory_user::InventoryUser::unlocked_custom_banner`]
-    /// starting in Phase 4.
+    /// Per-set charge: `/profile set banner <url|attachment>` deducts
+    /// [`crate::pawthos::consts::BANNER_SET_COST`] tabs each time it stores
+    /// a non-empty URL. Clearing the banner is free.
     #[serde(default)]
     pub banner_url: Option<String>,
 
     /// Custom accent colour (as a raw RGB u32) for the profile embed border.
     /// Falls back to the bot's default green when `None`.
     ///
-    /// Gated by
-    /// [`crate::pawthos::structs::inventory_user::InventoryUser::unlocked_custom_colorway`]
-    /// starting in Phase 3.
+    /// Per-set charge: `/profile set colorway <hex>` deducts
+    /// [`crate::pawthos::consts::CUSTOM_COLORWAY_SET_COST`] tabs each time.
+    /// Equipping a named colorway via `/profile set namedcolorway` from
+    /// [`crate::pawthos::structs::inventory_user::InventoryUser::owned_colorways`]
+    /// is free.
     #[serde(default)]
     pub colorway: Option<u32>,
 
@@ -65,11 +67,6 @@ pub struct ProfileUser {
     /// [`Self::colorway`] when rendering `/profile view`.
     #[serde(default)]
     pub active_colorway_id: Option<String>,
-
-    /// ID of the equipped named banner. Takes precedence over
-    /// [`Self::banner_url`] when rendering `/profile view`.
-    #[serde(default)]
-    pub active_banner_id: Option<String>,
 
     /// Badge IDs pinned to the user's profile card, in display order.
     ///

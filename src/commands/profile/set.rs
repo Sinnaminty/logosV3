@@ -1,16 +1,20 @@
 //! `/profile set` subcommands — customise profile fields.
 //!
 //! - [`bio`] — set your profile bio text.
-//! - [`banner`] — set a banner image URL (or attachment).
-//! - [`colorway`] — set a custom accent colour for your profile embed.
+//! - [`banner`] — set a banner image URL or attachment (charged per-set).
+//! - [`colorway`] — set a custom accent colour for your profile embed (charged per-set).
+//! - [`namedcolorway`] — equip one of your owned catalog colorways (free).
 //! - [`title`] — equip one of your owned catalog titles.
 //! - [`customtitle`] — set a user-written title (requires the unlock).
 
 use crate::pawthos::{
-    consts::{MAX_ACTIVE_BADGES, MAX_CUSTOM_TITLE_LEN},
+    consts::{
+        BANNER_SET_COST, CUSTOM_COLORWAY_SET_COST, MAX_ACTIVE_BADGES, MAX_CUSTOM_TITLE_LEN,
+        TAB_EMOJI,
+    },
     enums::inventory_errors::InventoryError,
     enums::profile_errors::ProfileError,
-    structs::shop_catalog::{self, BANNERS, COLORWAYS, TITLES},
+    structs::shop_catalog::{self, COLORWAYS, TITLES},
     types::{Context, Result},
 };
 use crate::utils;
@@ -22,7 +26,6 @@ use poise::serenity_prelude::{self as serenity, AutocompleteChoice};
     subcommands(
         "bio",
         "banner",
-        "namedbanner",
         "colorway",
         "namedcolorway",
         "title",
@@ -57,10 +60,11 @@ pub async fn bio(
     Ok(())
 }
 
-/// Set a custom banner image for your profile card.
+/// Set a custom banner image for your profile card. Charged per-set.
 ///
-/// Requires the Custom Banner Unlock from `/shop buy unlock`. You can provide
-/// a URL or upload a file attachment (attachment takes priority).
+/// Costs [`BANNER_SET_COST`] tabs every time you store a non-empty URL.
+/// Provide either a URL or an attachment (attachment wins on conflict).
+/// Calling this with neither argument clears your banner — that's free.
 #[poise::command(slash_command)]
 pub async fn banner(
     ctx: Context<'_>,
@@ -70,80 +74,63 @@ pub async fn banner(
     >,
 ) -> Result {
     let user_id = ctx.author().id;
-
-    // Gate: requires the unlock.
-    let unlocked = ctx
-        .data()
-        .with_inventory_user_read(user_id, |inv| Ok(inv.unlocked_custom_banner))
-        .await
-        .unwrap_or(false);
-    if !unlocked {
-        return Err(InventoryError::FeatureLocked("banner").into());
-    }
-
     let banner_url = attachment.as_ref().map(|a| a.url.clone()).or(url);
 
+    // Clearing is free; just write None.
+    let Some(new_url) = banner_url else {
+        ctx.data()
+            .with_profile_user_write(user_id, |p| {
+                p.banner_url = None;
+                Ok(())
+            })
+            .await?;
+        ctx.send(utils::reply_ok(
+            "Profile Set Banner",
+            "Your banner has been cleared.",
+        ))
+        .await?;
+        return Ok(());
+    };
+
+    // Charge first — propagates `WalletError::NotEnoughTabs` to the error handler.
+    let tabs = ctx
+        .data()
+        .with_wallet_user_write(user_id, |w| w.remove_tabs(BANNER_SET_COST))
+        .await?;
+
     ctx.data()
-        .with_profile_user_write(user_id, |p| {
-            p.banner_url = banner_url.clone();
-            // Custom beats named: clear any named-banner equip so the render picks up the new custom.
-            if banner_url.is_some() {
-                p.active_banner_id = None;
-            }
+        .with_inventory_user_write(user_id, |inv| {
+            inv.tabs_spent_lifetime = inv.tabs_spent_lifetime.saturating_add(BANNER_SET_COST);
             Ok(())
         })
         .await?;
 
-    let msg = if banner_url.is_some() {
-        "Your banner has been updated!"
-    } else {
-        "Your banner has been cleared."
-    };
-
-    ctx.send(utils::reply_ok("Profile Set Banner", msg)).await?;
-    Ok(())
-}
-
-/// Equip one of your owned named banners.
-#[poise::command(slash_command)]
-pub async fn namedbanner(
-    ctx: Context<'_>,
-    #[description = "Which banner to equip"]
-    #[autocomplete = "owned_banners_ac"]
-    id: String,
-) -> Result {
-    let user_id = ctx.author().id;
-    let def = shop_catalog::lookup_banner(&id)
-        .ok_or_else(|| InventoryError::UnknownItem(id.clone()))?;
-
-    let owned = ctx
-        .data()
-        .with_inventory_user_read(user_id, |inv| Ok(inv.owned_banners.iter().any(|b| b == &id)))
-        .await
-        .unwrap_or(false);
-    if !owned {
-        return Err(InventoryError::NotOwned(def.item.name.to_string()).into());
-    }
-
     ctx.data()
         .with_profile_user_write(user_id, |p| {
-            p.active_banner_id = Some(id.clone());
+            p.banner_url = Some(new_url);
             Ok(())
         })
         .await?;
 
     ctx.send(utils::reply_ok(
-        "Profile Set Named Banner",
-        format!("Equipped banner: **{}**.", def.item.name),
+        "Profile Set Banner",
+        format!(
+            "Your banner has been updated for **{BANNER_SET_COST} {TAB_EMOJI}**! Balance: **{tabs} {TAB_EMOJI}**.",
+        ),
     ))
     .await?;
+
+    ctx.data()
+        .check_achievements(user_id, ctx.channel_id(), ctx.http())
+        .await;
     Ok(())
 }
 
-/// Set a custom accent colour for your profile card embed.
+/// Set a custom accent colour for your profile card embed. Charged per-set.
 ///
-/// Requires the Custom Colorway Unlock from `/shop buy unlock`. Accepts bare
-/// hex (`FF8800`) or `0x`-prefixed (`0xFF8800`).
+/// Costs [`CUSTOM_COLORWAY_SET_COST`] tabs every time. Accepts bare hex
+/// (`FF8800`) or `0x`-prefixed (`0xFF8800`). Equipping an *owned* named
+/// colorway via `/profile set namedcolorway` is free instead.
 #[poise::command(slash_command)]
 pub async fn colorway(
     ctx: Context<'_>,
@@ -151,19 +138,22 @@ pub async fn colorway(
 ) -> Result {
     let user_id = ctx.author().id;
 
-    // Gate: requires the unlock.
-    let unlocked = ctx
-        .data()
-        .with_inventory_user_read(user_id, |inv| Ok(inv.unlocked_custom_colorway))
-        .await
-        .unwrap_or(false);
-    if !unlocked {
-        return Err(InventoryError::FeatureLocked("colorway").into());
-    }
-
+    // Validate before charging — bad hex shouldn't cost the user anything.
     let trimmed = color.strip_prefix("0x").unwrap_or(&color);
     let color_int =
         u32::from_str_radix(trimmed, 16).map_err(|_| ProfileError::InvalidColorway)?;
+
+    let tabs = ctx
+        .data()
+        .with_wallet_user_write(user_id, |w| w.remove_tabs(CUSTOM_COLORWAY_SET_COST))
+        .await?;
+
+    ctx.data()
+        .with_inventory_user_write(user_id, |inv| {
+            inv.tabs_spent_lifetime = inv.tabs_spent_lifetime.saturating_add(CUSTOM_COLORWAY_SET_COST);
+            Ok(())
+        })
+        .await?;
 
     ctx.data()
         .with_profile_user_write(user_id, |p| {
@@ -176,9 +166,15 @@ pub async fn colorway(
 
     ctx.send(utils::reply_ok(
         "Profile Set Colorway",
-        format!("Your profile accent colour is now `#{trimmed}`!"),
+        format!(
+            "Your profile accent colour is now `#{trimmed}` for **{CUSTOM_COLORWAY_SET_COST} {TAB_EMOJI}**. Balance: **{tabs} {TAB_EMOJI}**.",
+        ),
     ))
     .await?;
+
+    ctx.data()
+        .check_achievements(user_id, ctx.channel_id(), ctx.http())
+        .await;
     Ok(())
 }
 
@@ -361,25 +357,6 @@ async fn owned_colorways_ac(ctx: Context<'_>, partial: &str) -> Vec<Autocomplete
         })
         .take(25)
         .map(|c| AutocompleteChoice::new(c.item.name.to_string(), c.item.id.to_string()))
-        .collect()
-}
-
-async fn owned_banners_ac(ctx: Context<'_>, partial: &str) -> Vec<AutocompleteChoice> {
-    let p = partial.to_lowercase();
-    let owned = ctx
-        .data()
-        .with_inventory_user_read(ctx.author().id, |inv| Ok(inv.owned_banners.clone()))
-        .await
-        .unwrap_or_default();
-
-    BANNERS
-        .iter()
-        .filter(|b| owned.iter().any(|id| id == b.item.id))
-        .filter(|b| {
-            b.item.name.to_lowercase().contains(&p) || b.item.id.to_lowercase().contains(&p)
-        })
-        .take(25)
-        .map(|b| AutocompleteChoice::new(b.item.name.to_string(), b.item.id.to_string()))
         .collect()
 }
 

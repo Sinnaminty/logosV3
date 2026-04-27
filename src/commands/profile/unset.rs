@@ -52,13 +52,12 @@ pub async fn colorway(ctx: Context<'_>) -> Result {
     Ok(())
 }
 
-/// Clear your profile banner. Removes both the named-equip and the custom URL.
+/// Clear your profile banner.
 #[poise::command(slash_command)]
 pub async fn banner(ctx: Context<'_>) -> Result {
     let user_id = ctx.author().id;
     ctx.data()
         .with_profile_user_write(user_id, |p| {
-            p.active_banner_id = None;
             p.banner_url = None;
             Ok(())
         })

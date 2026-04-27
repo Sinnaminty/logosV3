@@ -131,14 +131,7 @@ fn resolve_colorway(profile: &ProfileUser) -> Color {
 }
 
 /// Resolve which banner URL (if any) to render.
-///
-/// Priority: named banner (catalog lookup) → custom URL → none.
 fn resolve_banner(profile: &ProfileUser) -> Option<String> {
-    if let Some(ref id) = profile.active_banner_id
-        && let Some(def) = shop_catalog::lookup_banner(id)
-    {
-        return Some(def.url.to_string());
-    }
     profile.banner_url.clone()
 }
 

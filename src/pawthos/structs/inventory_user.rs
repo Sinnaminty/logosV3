@@ -26,13 +26,10 @@ pub struct InventoryUser {
     #[serde(default)]
     pub owned_titles: Vec<String>,
 
-    /// Named colorway IDs the user has purchased.
+    /// Named colorway IDs the user has purchased. Owners can freely swap
+    /// between any owned colorway via `/profile set namedcolorway`.
     #[serde(default)]
     pub owned_colorways: Vec<String>,
-
-    /// Named banner IDs the user has purchased.
-    #[serde(default)]
-    pub owned_banners: Vec<String>,
 
     /// Badge IDs the user has earned — combined lootbox pool (`box_*`)
     /// and achievement grants (`ach_*`).
@@ -40,29 +37,19 @@ pub struct InventoryUser {
     pub owned_badges: Vec<String>,
 
     // ---------------------------------------------------------------------
-    // Custom-field slots (must be unlocked before being settable)
+    // Custom-field slots
     // ---------------------------------------------------------------------
     /// User-supplied title text, capped at
-    /// [`crate::pawthos::consts::MAX_CUSTOM_TITLE_LEN`] chars.
+    /// [`crate::pawthos::consts::MAX_CUSTOM_TITLE_LEN`] chars. Gated by
+    /// [`Self::unlocked_custom_title`] (one-time unlock).
     #[serde(default)]
     pub custom_title: Option<String>,
 
-    // ---------------------------------------------------------------------
-    // Paywall unlocks for `/profile set …` commands
-    // ---------------------------------------------------------------------
-    /// Gates `/profile set colorway <hex>`. Set true after purchasing the
-    /// custom-colorway unlock, or by the grandfather migration if the user
-    /// had a colorway before the paywall landed.
-    #[serde(default)]
-    pub unlocked_custom_colorway: bool,
-
-    /// Gates `/profile set customtitle <text>`.
+    /// Gates `/profile set customtitle <text>`. Custom colorway and custom
+    /// banner are *not* unlocks — they charge per-set in the command
+    /// handler instead.
     #[serde(default)]
     pub unlocked_custom_title: bool,
-
-    /// Gates `/profile set banner <url|attachment>`.
-    #[serde(default)]
-    pub unlocked_custom_banner: bool,
 
     // ---------------------------------------------------------------------
     // Interaction statistics (feed the achievement system in Phase 7)

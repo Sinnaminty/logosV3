@@ -11,10 +11,12 @@
 use crate::commands::shop::buy::buy;
 use crate::commands::shop::gift::gift;
 use crate::pawthos::{
-    consts::TAB_EMOJI,
+    consts::{
+        BANNER_SET_COST, CUSTOM_COLORWAY_SET_COST, ROLE_COLOR_COST, ROLE_NAME_COST, TAB_EMOJI,
+    },
     enums::embed_type::EmbedType,
     structs::inventory_user::InventoryUser,
-    structs::shop_catalog::{self, BANNERS, COLORWAYS, LOOTBOX_ITEM, LOOTBOX_POOL, TITLES, UNLOCKS},
+    structs::shop_catalog::{self, COLORWAYS, LOOTBOX_ITEM, LOOTBOX_POOL, TITLES, UNLOCKS},
     types::{Context, Result},
 };
 use crate::utils;
@@ -47,7 +49,9 @@ pub async fn browse(ctx: Context<'_>) -> Result {
     }
 
     if !COLORWAYS.is_empty() {
-        description.push_str("**🎨 Colorways** — your profile embed's accent colour\n");
+        description.push_str(
+            "**🎨 Colorways** — owned named colorways equip free; setting a custom hex on your profile costs tabs (see Per-use below).\n",
+        );
         for c in COLORWAYS {
             description.push_str(&format!(
                 "`{}` — **{}** · {} {TAB_EMOJI}\n",
@@ -57,16 +61,13 @@ pub async fn browse(ctx: Context<'_>) -> Result {
         description.push('\n');
     }
 
-    if !BANNERS.is_empty() {
-        description.push_str("**🖼️ Banners** — the image at the bottom of your profile card\n");
-        for b in BANNERS {
-            description.push_str(&format!(
-                "`{}` — **{}** · {} {TAB_EMOJI}\n",
-                b.item.id, b.item.name, b.item.cost,
-            ));
-        }
-        description.push('\n');
-    }
+    description.push_str(&format!(
+        "**🛠 Per-use cosmetics** — charged each time you invoke them.\n\
+         `/shop buy rolecolor <hex>` — change your colour role's colour · {ROLE_COLOR_COST} {TAB_EMOJI}\n\
+         `/shop buy rolename <text>` — rename your colour role · {ROLE_NAME_COST} {TAB_EMOJI}\n\
+         `/profile set colorway <hex>` — custom hex profile accent · {CUSTOM_COLORWAY_SET_COST} {TAB_EMOJI}\n\
+         `/profile set banner <url|attachment>` — custom profile banner · {BANNER_SET_COST} {TAB_EMOJI}\n\n",
+    ));
 
     if !LOOTBOX_POOL.is_empty() {
         use crate::pawthos::consts::{
@@ -133,7 +134,6 @@ pub async fn inventory(ctx: Context<'_>) -> Result {
     )
     .field("Titles", render_titles(&inv), false)
     .field("Colorways", render_colorways(&inv), false)
-    .field("Banners", render_banners(&inv), false)
     .field("Badges", render_badges(&inv), false)
     .field("Unlocks", render_unlocks(&inv), false);
 
@@ -148,19 +148,11 @@ pub async fn inventory(ctx: Context<'_>) -> Result {
 
 fn render_summary(inv: &InventoryUser) -> String {
     let badge_count = inv.owned_badges.len();
-    let unlock_count = [
-        inv.unlocked_custom_title,
-        inv.unlocked_custom_colorway,
-        inv.unlocked_custom_banner,
-    ]
-    .iter()
-    .filter(|b| **b)
-    .count();
+    let unlock_count = if inv.unlocked_custom_title { 1 } else { 0 };
     format!(
-        "**{}** titles · **{}** colorways · **{}** banners · **{}** badges · **{}** unlocks",
+        "**{}** titles · **{}** colorways · **{}** badges · **{}** unlocks",
         inv.owned_titles.len(),
         inv.owned_colorways.len(),
-        inv.owned_banners.len(),
         badge_count,
         unlock_count,
     )
@@ -192,20 +184,6 @@ fn render_colorways(inv: &InventoryUser) -> String {
         .iter()
         .map(|id| match shop_catalog::lookup_colorway(id) {
             Some(c) => format!("• **{}** · `#{:06X}`", c.item.name, c.hex),
-            None => format!("• `{id}` *(unknown)*"),
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn render_banners(inv: &InventoryUser) -> String {
-    if inv.owned_banners.is_empty() {
-        return "*None owned.*".into();
-    }
-    inv.owned_banners
-        .iter()
-        .map(|id| match shop_catalog::lookup_banner(id) {
-            Some(b) => format!("• **{}**", b.item.name),
             None => format!("• `{id}` *(unknown)*"),
         })
         .collect::<Vec<_>>()
@@ -245,19 +223,9 @@ fn render_badges(inv: &InventoryUser) -> String {
 }
 
 fn render_unlocks(inv: &InventoryUser) -> String {
-    let mut lines: Vec<&str> = Vec::new();
     if inv.unlocked_custom_title {
-        lines.push("• Custom Title");
-    }
-    if inv.unlocked_custom_colorway {
-        lines.push("• Custom Colorway");
-    }
-    if inv.unlocked_custom_banner {
-        lines.push("• Custom Banner");
-    }
-    if lines.is_empty() {
-        "*None.*".into()
+        "• Custom Title".into()
     } else {
-        lines.join("\n")
+        "*None.*".into()
     }
 }
