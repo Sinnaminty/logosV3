@@ -14,7 +14,7 @@
 use crate::pawthos::consts::{
     FAUCET_EXPIRY_SECS, FAUCET_GLOBAL_COOLDOWN_SECS, FAUCET_REWARD, FAUCET_TRIGGER_CHANCE,
 };
-use crate::pawthos::enums::pawthos_errors::PawthosErrors;
+use crate::pawthos::enums::pawthos_errors::PawthosError;
 use crate::pawthos::enums::{embed_type::EmbedType, mimic_errors::MimicError};
 use crate::pawthos::structs::data::{BountyState, Data};
 use crate::pawthos::types::Error;
@@ -68,7 +68,7 @@ pub fn error_handler(
                 // the user so they don't wonder why their messages stopped being
                 // intercepted.
                 FullEvent::Message { new_message } => match error {
-                    PawthosErrors::Mimic(MimicError::NoActiveMimic) => {
+                    PawthosError::Mimic(MimicError::NoActiveMimic) => {
                         let user_id = new_message.author.id;
                         let _ = framework
                             .user_data
@@ -241,29 +241,35 @@ async fn try_spawn_faucet_bounty(
     data: &Data,
     new_message: &Message,
 ) {
-    // Cooldown check — avoid bunching bounties.
-    {
-        let last = data.faucet_last_spawn.read().await;
-        if let Some(prev) = *last
-            && (Utc::now() - prev).num_seconds() < FAUCET_GLOBAL_COOLDOWN_SECS
-        {
-            return;
-        }
-    }
-
-    // Probabilistic trigger.
+    // Roll first — most messages bail here without touching any locks.
     let roll: f64 = rand::thread_rng().r#gen();
     if roll >= FAUCET_TRIGGER_CHANCE {
         return;
     }
 
-    // Try to react first — only record the bounty if the reaction sticks.
+    // Atomically check-and-claim the cooldown slot. Holding the write lock
+    // across the check-and-set prevents two messages from both passing the
+    // cooldown check between a separate read+write.
+    let now = Utc::now();
+    {
+        let mut last = data.faucet_last_spawn.write().await;
+        if let Some(prev) = *last
+            && (now - prev).num_seconds() < FAUCET_GLOBAL_COOLDOWN_SECS
+        {
+            return;
+        }
+        *last = Some(now);
+    }
+
+    // React. If this fails we keep the claimed cooldown slot — the next
+    // attempt simply waits the full window. Releasing on failure would let
+    // the cooldown be retried unboundedly against a permission issue.
     if let Err(e) = new_message.react(&ctx.http, utils::tab_reaction()).await {
         log::debug!("Faucet spawn — react failed: {e}");
         return;
     }
 
-    let expires_at = Utc::now() + ChronoDuration::seconds(FAUCET_EXPIRY_SECS);
+    let expires_at = now + ChronoDuration::seconds(FAUCET_EXPIRY_SECS);
     {
         let mut bounties = data.faucet_bounties.write().await;
         bounties.insert(
@@ -275,7 +281,6 @@ async fn try_spawn_faucet_bounty(
             },
         );
     }
-    *data.faucet_last_spawn.write().await = Some(Utc::now());
     log::info!(
         "Faucet spawned on message {} in channel {}",
         new_message.id,

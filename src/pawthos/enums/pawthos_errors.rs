@@ -1,6 +1,6 @@
 //! Top-level error type for the bot.
 //!
-//! [`PawthosErrors`] is the concrete `Error` type threaded through the Poise
+//! [`PawthosError`] is the concrete `Error` type threaded through the Poise
 //! framework (see [`crate::pawthos::types::Error`]). Every domain-specific
 //! error type has a `#[from]` variant here, so command handlers can use `?`
 //! on any sub-system error and have it automatically wrapped.
@@ -23,7 +23,7 @@ use crate::pawthos::enums::wallet_errors::WalletError;
 /// Each variant wraps one of the sub-system error types (or a third-party
 /// error) and provides a human-readable `Display` message via `thiserror`.
 #[derive(thiserror::Error, Debug)]
-pub enum PawthosErrors {
+pub enum PawthosError {
     /// A Discord API or Gateway error from Serenity/Poise.
     #[error("SerenityError: {0}")]
     Serenity(#[from] poise::serenity_prelude::Error),
@@ -74,18 +74,18 @@ pub enum PawthosErrors {
     Inventory(#[from] InventoryError),
 }
 
-/// Convert a `chrono::ParseError` directly into a `PawthosErrors` by routing
+/// Convert a `chrono::ParseError` directly into a `PawthosError` by routing
 /// it through `ScheduleError::ParseError`.
-impl From<chrono::ParseError> for PawthosErrors {
+impl From<chrono::ParseError> for PawthosError {
     fn from(value: chrono::ParseError) -> Self {
-        PawthosErrors::Schedule(ScheduleError::ParseError(value))
+        PawthosError::Schedule(ScheduleError::ParseError(value))
     }
 }
 
-/// Convert an `image::ImageError` directly into a `PawthosErrors` by routing
+/// Convert an `image::ImageError` directly into a `PawthosError` by routing
 /// it through `ColorError::ImageError`.
-impl From<image::ImageError> for PawthosErrors {
+impl From<image::ImageError> for PawthosError {
     fn from(value: image::ImageError) -> Self {
-        PawthosErrors::Color(ColorError::ImageError(value))
+        PawthosError::Color(ColorError::ImageError(value))
     }
 }

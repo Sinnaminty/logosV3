@@ -86,6 +86,21 @@ pub fn create_embed_builder(
 }
 
 // ---------------------------------------------------------------------------
+// Colour parsing
+// ---------------------------------------------------------------------------
+
+/// Parse a hex colour string into its raw 24-bit RGB integer plus the
+/// trimmed (no `0x` prefix) form, suitable for display.
+///
+/// Accepts bare hex (`FF8800`) or `0x`-prefixed (`0xFF8800`). Returns
+/// `None` if the string isn't valid hexadecimal. Callers map `None` to
+/// their domain-appropriate error type.
+pub fn parse_hex_color(s: &str) -> Option<(u32, &str)> {
+    let trimmed = s.strip_prefix("0x").unwrap_or(s);
+    u32::from_str_radix(trimmed, 16).ok().map(|n| (n, trimmed))
+}
+
+// ---------------------------------------------------------------------------
 // Reaction helpers
 // ---------------------------------------------------------------------------
 

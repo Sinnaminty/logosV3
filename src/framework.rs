@@ -93,15 +93,17 @@ fn load_user_db() -> UserDB {
 fn run_migrations(_user_db: &mut UserDB) {}
 
 // ---------------------------------------------------------------------------
-// Wallet list (daily claim tracking)
+// Daily claim log
 // ---------------------------------------------------------------------------
 
-/// The daily-claim tracking file, persisted as `wallet_list.json`.
+/// The daily-claim tracking record.
 ///
-/// The list resets automatically when [`WalletList::date`] falls behind the
-/// current local date — no cron job or scheduled reset is needed.
+/// Persisted as `wallet_list.json` (filename retained for compatibility with
+/// existing deployments). Resets automatically when [`DailyClaimLog::date`]
+/// falls behind the current local date — no cron job or scheduled reset is
+/// needed.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct WalletList {
+struct DailyClaimLog {
     /// The date for which `list` was last updated.
     date: chrono::NaiveDate,
 
@@ -109,24 +111,25 @@ struct WalletList {
     list: Vec<u64>,
 }
 
-/// Write `wallet_list` to `wallet_list.json` atomically.
-fn save_wallet_list(wallet_list: WalletList) -> Result {
+/// Write the daily-claim log to disk atomically.
+fn save_daily_claim_log(claim_log: DailyClaimLog) -> Result {
     const FILE_PATH: &str = "wallet_list.json";
-    let wallet_list_json = poise::serenity_prelude::json::to_string(&wallet_list)?;
+    let claim_log_json = poise::serenity_prelude::json::to_string(&claim_log)?;
     let tmp_path = format!("{FILE_PATH}.tmp");
-    std::fs::write(&tmp_path, &wallet_list_json)?;
+    std::fs::write(&tmp_path, &claim_log_json)?;
     std::fs::rename(&tmp_path, FILE_PATH)?;
     log::debug!("{} saved :3c", FILE_PATH);
     Ok(())
 }
 
-/// Load `wallet_list.json`, returning an empty list on missing/corrupt file.
-fn load_wallet_list() -> Result<WalletList, Error> {
+/// Load the daily-claim log from disk, returning an empty log on
+/// missing/corrupt file.
+fn load_daily_claim_log() -> Result<DailyClaimLog, Error> {
     const FILE_PATH: &str = "wallet_list.json";
-    let wallet_list =
-        std::fs::read_to_string(FILE_PATH).map(serenity::json::from_str::<WalletList>);
+    let claim_log =
+        std::fs::read_to_string(FILE_PATH).map(serenity::json::from_str::<DailyClaimLog>);
 
-    match wallet_list {
+    match claim_log {
         Ok(Ok(db)) => {
             log::info!("{} found, importing..", FILE_PATH);
             Ok(db)
@@ -145,26 +148,26 @@ fn load_wallet_list() -> Result<WalletList, Error> {
 /// Check whether user `id` has already claimed their daily reward today, and
 /// if not, mark them as having claimed it.
 ///
-/// The list resets when its stored `date` is earlier than today. All I/O is
+/// The log resets when its stored `date` is earlier than today. All I/O is
 /// synchronous because this runs inside the single-threaded persistence task
 /// loop (no async needed, no risk of concurrent access).
 fn daily_check(id: u64) -> Result<UserDailyClaimed, Error> {
-    let mut wallet_list = load_wallet_list()?;
+    let mut claim_log = load_daily_claim_log()?;
 
     let today = chrono::Local::now().date_naive();
-    if wallet_list.date < today {
-        wallet_list.list.clear();
-        wallet_list.date = today;
+    if claim_log.date < today {
+        claim_log.list.clear();
+        claim_log.date = today;
     }
 
-    let result = if wallet_list.list.contains(&id) {
+    let result = if claim_log.list.contains(&id) {
         UserDailyClaimed::Claimed
     } else {
-        wallet_list.list.push(id);
+        claim_log.list.push(id);
         UserDailyClaimed::Unclaimed
     };
 
-    save_wallet_list(wallet_list)?;
+    save_daily_claim_log(claim_log)?;
     Ok(result)
 }
 

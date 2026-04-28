@@ -3,15 +3,15 @@
 //! Centralising these aliases keeps import lists short and makes it easy
 //! to swap underlying types (e.g. switching error strategy) in one place.
 
-use crate::pawthos::enums::pawthos_errors::PawthosErrors;
+use crate::pawthos::enums::pawthos_errors::PawthosError;
 use crate::pawthos::structs::data::Data;
 use poise::serenity_prelude as serenity;
 
 /// The concrete error type for all bot operations.
 ///
 /// Every `?` in a command or event handler ultimately converts its error into
-/// this type via the `#[from]` impls on [`PawthosErrors`].
-pub type Error = PawthosErrors;
+/// this type via the `#[from]` impls on [`PawthosError`].
+pub type Error = PawthosError;
 
 /// Poise command context carrying [`Data`] and [`Error`].
 ///

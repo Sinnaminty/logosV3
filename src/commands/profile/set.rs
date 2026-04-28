@@ -139,9 +139,8 @@ pub async fn colorway(
     let user_id = ctx.author().id;
 
     // Validate before charging — bad hex shouldn't cost the user anything.
-    let trimmed = color.strip_prefix("0x").unwrap_or(&color);
-    let color_int =
-        u32::from_str_radix(trimmed, 16).map_err(|_| ProfileError::InvalidColorway)?;
+    let (color_int, trimmed) =
+        utils::parse_hex_color(&color).ok_or(ProfileError::InvalidColorway)?;
 
     let tabs = ctx
         .data()

@@ -423,9 +423,8 @@ pub async fn rolecolor(
     let guild_id = ctx.guild_id().unwrap();
 
     // Validate before doing any I/O.
-    let trimmed = color.strip_prefix("0x").unwrap_or(&color);
-    let color_int =
-        u32::from_str_radix(trimmed, 16).map_err(|_| ColorError::IncorrectFormat)?;
+    let (color_int, trimmed) =
+        utils::parse_hex_color(&color).ok_or(ColorError::IncorrectFormat)?;
     let role_color = if color_int == 0 {
         serenity::Colour::from_rgb(1, 1, 1)
     } else {

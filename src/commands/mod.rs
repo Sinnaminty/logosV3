@@ -281,11 +281,8 @@ pub async fn preview(
     ctx: Context<'_>,
     #[description = "Hex code of the color you want to preview."] color: String,
 ) -> Result {
-    let trimmed = color.strip_prefix("0x").unwrap_or(&color);
-
-    let color = poise::serenity_prelude::Colour::new(
-        u32::from_str_radix(trimmed, 16).map_err(|_| ColorError::IncorrectFormat)?,
-    );
+    let (color_int, _) = utils::parse_hex_color(&color).ok_or(ColorError::IncorrectFormat)?;
+    let color = poise::serenity_prelude::Colour::new(color_int);
     let mut img = image::RgbaImage::new(COLOR_PREVIEW_SIZE, COLOR_PREVIEW_SIZE);
     for px in img.pixels_mut() {
         *px = image::Rgba([color.r(), color.g(), color.b(), 255]);

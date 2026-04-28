@@ -2,7 +2,7 @@
 //!
 //! Each feature area owns its own error type so that command handlers can
 //! return fine-grained errors with `?` without losing context.  All of these
-//! are rolled up into the single top-level [`pawthos_errors::PawthosErrors`]
+//! are rolled up into the single top-level [`pawthos_errors::PawthosError`]
 //! via `#[from]` derives, which is the concrete `Error` type threaded through
 //! the Poise framework.
 //!
