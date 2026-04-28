@@ -2,7 +2,8 @@
 //!
 //! This module owns:
 //! - [`return_commands`] — the list of all commands registered with the framework.
-//! - Utility commands: `help`, `pfp`, `daily`, `balance`.
+//! - Utility commands: `help`, `pfp`, `daily`, `balance`, `leaderboard`,
+//!   `achievements`.
 //! - The `/color preview` command (free hex preview swatch). Paid role
 //!   colour and name changes live in `/shop buy rolecolor` and
 //!   `/shop buy rolename`.

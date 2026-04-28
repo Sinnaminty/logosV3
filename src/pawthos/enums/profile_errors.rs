@@ -4,7 +4,7 @@
 #[derive(thiserror::Error, Debug)]
 pub enum ProfileError {
     /// The calling user has no entry in the profile database.
-    #[error("No Profile User found in Profile User Database!")]
+    #[error("No Profile User found in User Database!")]
     NoUserFound,
 
     /// The provided hex colour string could not be parsed.

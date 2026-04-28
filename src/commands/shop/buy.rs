@@ -381,7 +381,6 @@ fn rarity_name(r: Rarity) -> &'static str {
         Rarity::Uncommon => "Uncommon",
         Rarity::Rare => "Rare",
         Rarity::Legendary => "Legendary",
-        Rarity::Achievement => "Achievement",
     }
 }
 
@@ -391,7 +390,6 @@ fn odds_for(r: Rarity) -> f64 {
         Rarity::Uncommon => LOOTBOX_CHANCE_UNCOMMON,
         Rarity::Rare => LOOTBOX_CHANCE_RARE,
         Rarity::Legendary => LOOTBOX_CHANCE_LEGENDARY,
-        Rarity::Achievement => 0.0,
     }
 }
 

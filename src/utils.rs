@@ -1,8 +1,10 @@
 //! Shared utility functions and traits.
 //!
 //! Contains the [`ResultExt`] helper trait, the standard embed builder, the
-//! three high-level reply helpers ([`reply_ok`], [`reply_err`], [`reply_info`]),
-//! and the webhook fetch-or-create helper used by the mimic feature.
+//! reply helpers ([`reply_ok`], [`reply_info`]), and the webhook
+//! fetch-or-create helper used by the mimic feature. Errors flow through the
+//! Poise framework's `on_error` hook in [`crate::handlers`] rather than
+//! through a `reply_err` helper.
 
 use crate::pawthos::consts::{TAB_EMOJI_ID, TAB_EMOJI_NAME};
 use crate::pawthos::enums::embed_type::EmbedType;
@@ -47,13 +49,6 @@ pub fn reply_ok(title: impl Into<String>, body: impl Into<String>) -> Reply {
     Reply::default().embed(create_embed_builder(title, body, EmbedType::Good))
 }
 
-/// Build an "error" reply with a red embed.
-///
-/// Shorthand for `Reply::default().embed(create_embed_builder(title, body, EmbedType::Bad))`.
-pub fn reply_err(title: impl Into<String>, body: impl Into<String>) -> Reply {
-    Reply::default().embed(create_embed_builder(title, body, EmbedType::Bad))
-}
-
 /// Build an "informational" reply with a neutral (pink) embed.
 ///
 /// Shorthand for `Reply::default().embed(create_embed_builder(title, body, EmbedType::Neutral))`.
@@ -89,10 +84,6 @@ pub fn create_embed_builder(
         .author(serenity::builder::CreateEmbedAuthor::new("Logos"))
         .color(embed_type.into_color())
 }
-
-// ---------------------------------------------------------------------------
-// Webhook helpers
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Reaction helpers

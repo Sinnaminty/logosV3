@@ -266,9 +266,6 @@ impl Data {
             return Err(WalletError::RecvError);
         };
 
-        //if daily daily_claimed, return daily error
-        //else, add 10 tabs to user account and return number of tabs
-
         if daily_claimed == UserDailyClaimed::Claimed {
             let now = Local::now();
             let midnight = (Local::now() + Duration::days(1))

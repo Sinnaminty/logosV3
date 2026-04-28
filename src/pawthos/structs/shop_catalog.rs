@@ -26,7 +26,7 @@
 //! `owned_badges` vec into lootbox vs. achievement sections without storing
 //! a separate tag.
 
-use crate::pawthos::consts::{LOOTBOX_COST, MAX_CUSTOM_TITLE_LEN};
+use crate::pawthos::consts::LOOTBOX_COST;
 use crate::pawthos::structs::inventory_user::InventoryUser;
 use crate::pawthos::structs::wallet_user::WalletUser;
 
@@ -38,34 +38,21 @@ pub enum Rarity {
     Uncommon,
     Rare,
     Legendary,
-    /// Achievement-granted items. Not rollable from a lootbox.
-    Achievement,
-}
-
-/// Which shop section an item belongs to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Category {
-    Title,
-    Colorway,
-    Badge,
-    /// One-time paywall unlock (currently only the custom-title unlock).
-    Unlock,
-    /// Lootbox pull service — buying one rolls a random badge.
-    Lootbox,
 }
 
 /// The common header every catalog entry carries.
 ///
 /// Typed definition structs ([`TitleDef`], [`ColorwayDef`], etc.) embed this
-/// plus their category-specific payload. [`lookup`] returns this header so
-/// callers don't need to branch on category unless they need the payload.
+/// plus their category-specific payload. The category itself is implicit in
+/// which static array the entry lives in; the lookup helpers
+/// ([`lookup_title`], [`lookup_colorway`], [`lookup_badge`]) preserve that
+/// distinction.
 #[derive(Debug, Clone, Copy)]
 pub struct ShopItem {
     pub id: &'static str,
     pub name: &'static str,
     pub description: &'static str,
     pub cost: i64,
-    pub category: Category,
     pub rarity: Rarity,
 }
 
@@ -97,42 +84,42 @@ pub const TITLES: &[TitleDef] = &[
     TitleDef { item: ShopItem {
         id: "title_tab_hoarder", name: "Tab Hoarder",
         description: "For those who save every last tab.",
-        cost: 10, category: Category::Title, rarity: Rarity::Common,
+        cost: 10, rarity: Rarity::Common,
     }},
     TitleDef { item: ShopItem {
         id: "title_early_adopter", name: "Early Adopter",
         description: "Here before the merch drops.",
-        cost: 10, category: Category::Title, rarity: Rarity::Common,
+        cost: 10, rarity: Rarity::Common,
     }},
     TitleDef { item: ShopItem {
         id: "title_certified_gremlin", name: "Certified Gremlin",
         description: "Your behaviour is noted.",
-        cost: 10, category: Category::Title, rarity: Rarity::Common,
+        cost: 10, rarity: Rarity::Common,
     }},
     TitleDef { item: ShopItem {
         id: "title_caffeine_dependent", name: "Caffeine Dependent",
         description: "Powered by legal stimulants.",
-        cost: 10, category: Category::Title, rarity: Rarity::Common,
+        cost: 10, rarity: Rarity::Common,
     }},
     TitleDef { item: ShopItem {
         id: "title_professional_lurker", name: "Professional Lurker",
         description: "Reads everything. Says nothing.",
-        cost: 10, category: Category::Title, rarity: Rarity::Common,
+        cost: 10, rarity: Rarity::Common,
     }},
     TitleDef { item: ShopItem {
         id: "title_night_owl", name: "Night Owl",
         description: "Active when the sun isn't.",
-        cost: 10, category: Category::Title, rarity: Rarity::Common,
+        cost: 10, rarity: Rarity::Common,
     }},
     TitleDef { item: ShopItem {
         id: "title_early_bird", name: "Early Bird",
         description: "Up before the standups.",
-        cost: 10, category: Category::Title, rarity: Rarity::Common,
+        cost: 10, rarity: Rarity::Common,
     }},
     TitleDef { item: ShopItem {
         id: "title_keyboard_warrior", name: "Keyboard Warrior",
         description: "Typing for the cause.",
-        cost: 10, category: Category::Title, rarity: Rarity::Common,
+        cost: 10, rarity: Rarity::Common,
     }},
 ];
 
@@ -141,42 +128,42 @@ pub const COLORWAYS: &[ColorwayDef] = &[
     ColorwayDef { item: ShopItem {
         id: "colorway_sunset", name: "Sunset",
         description: "Warm coral red.",
-        cost: 20, category: Category::Colorway, rarity: Rarity::Common,
+        cost: 20, rarity: Rarity::Common,
     }, hex: 0xFF6B6B },
     ColorwayDef { item: ShopItem {
         id: "colorway_ocean", name: "Ocean",
         description: "Deep blue.",
-        cost: 20, category: Category::Colorway, rarity: Rarity::Common,
+        cost: 20, rarity: Rarity::Common,
     }, hex: 0x4A90E2 },
     ColorwayDef { item: ShopItem {
         id: "colorway_neon_pink", name: "Neon Pink",
         description: "Loud and proud.",
-        cost: 20, category: Category::Colorway, rarity: Rarity::Common,
+        cost: 20, rarity: Rarity::Common,
     }, hex: 0xFF1493 },
     ColorwayDef { item: ShopItem {
         id: "colorway_midnight", name: "Midnight",
         description: "Almost black.",
-        cost: 20, category: Category::Colorway, rarity: Rarity::Common,
+        cost: 20, rarity: Rarity::Common,
     }, hex: 0x1A1A3E },
     ColorwayDef { item: ShopItem {
         id: "colorway_gold", name: "Gold",
         description: "Premium yellow.",
-        cost: 20, category: Category::Colorway, rarity: Rarity::Common,
+        cost: 20, rarity: Rarity::Common,
     }, hex: 0xFFD700 },
     ColorwayDef { item: ShopItem {
         id: "colorway_lavender", name: "Lavender",
         description: "Soft purple.",
-        cost: 20, category: Category::Colorway, rarity: Rarity::Common,
+        cost: 20, rarity: Rarity::Common,
     }, hex: 0xB57EDC },
     ColorwayDef { item: ShopItem {
         id: "colorway_crimson", name: "Crimson",
         description: "Classic red.",
-        cost: 20, category: Category::Colorway, rarity: Rarity::Common,
+        cost: 20, rarity: Rarity::Common,
     }, hex: 0xDC143C },
     ColorwayDef { item: ShopItem {
         id: "colorway_mint", name: "Mint",
         description: "Cool green.",
-        cost: 20, category: Category::Colorway, rarity: Rarity::Common,
+        cost: 20, rarity: Rarity::Common,
     }, hex: 0x98D8A1 },
 ];
 
@@ -201,7 +188,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_coffee", name: "Coffee Addict",
             description: "Fueled by caffeine.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Common,
+            cost: 0, rarity: Rarity::Common,
         },
         emoji: "☕",
     },
@@ -209,7 +196,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_bookworm", name: "Bookworm",
             description: "Reads the docs.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Common,
+            cost: 0, rarity: Rarity::Common,
         },
         emoji: "📖",
     },
@@ -217,7 +204,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_pixel_pusher", name: "Pixel Pusher",
             description: "Shipper of CSS.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Common,
+            cost: 0, rarity: Rarity::Common,
         },
         emoji: "🖼️",
     },
@@ -225,7 +212,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_moonlit", name: "Moonlit",
             description: "Working past bedtime.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Common,
+            cost: 0, rarity: Rarity::Common,
         },
         emoji: "🌙",
     },
@@ -234,7 +221,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_speedrunner", name: "Speedrunner",
             description: "Beat the standup.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Uncommon,
+            cost: 0, rarity: Rarity::Uncommon,
         },
         emoji: "🚀",
     },
@@ -242,7 +229,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_trailblazer", name: "Trailblazer",
             description: "Commits before coffee.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Uncommon,
+            cost: 0, rarity: Rarity::Uncommon,
         },
         emoji: "🧭",
     },
@@ -250,7 +237,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_stargazer", name: "Stargazer",
             description: "Collects repo stars.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Uncommon,
+            cost: 0, rarity: Rarity::Uncommon,
         },
         emoji: "⭐",
     },
@@ -259,7 +246,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_alchemist", name: "Alchemist",
             description: "Turns bugs into features.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Rare,
+            cost: 0, rarity: Rarity::Rare,
         },
         emoji: "🧪",
     },
@@ -267,7 +254,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_code_wizard", name: "Code Wizard",
             description: "It's not magic, it's hashmaps.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Rare,
+            cost: 0, rarity: Rarity::Rare,
         },
         emoji: "🪄",
     },
@@ -276,7 +263,7 @@ pub const LOOTBOX_POOL: &[BadgeDef] = &[
         item: ShopItem {
             id: "box_void_walker", name: "Void Walker",
             description: "Stared into the debugger and smiled.",
-            cost: 0, category: Category::Badge, rarity: Rarity::Legendary,
+            cost: 0, rarity: Rarity::Legendary,
         },
         emoji: "🌌",
     },
@@ -291,7 +278,7 @@ pub const UNLOCKS: &[ShopItem] = &[
     ShopItem {
         id: "unlock_custom_title", name: "Custom Title Unlock",
         description: "Enables `/profile set customtitle <text>` (up to 32 chars).",
-        cost: 30, category: Category::Unlock, rarity: Rarity::Uncommon,
+        cost: 30, rarity: Rarity::Uncommon,
     },
 ];
 
@@ -301,24 +288,12 @@ pub const UNLOCKS: &[ShopItem] = &[
 pub const LOOTBOX_ITEM: ShopItem = ShopItem {
     id: "lootbox", name: "Badge Lootbox",
     description: "Rolls a random badge by rarity. Duplicates salvage for tabs.",
-    cost: LOOTBOX_COST, category: Category::Lootbox, rarity: Rarity::Common,
+    cost: LOOTBOX_COST, rarity: Rarity::Common,
 };
 
 // ---------------------------------------------------------------------------
 // Lookup
 // ---------------------------------------------------------------------------
-
-/// Find any item across every table by its ID.
-///
-/// Linear scan — table sizes are small (<100 total) so this is fine.
-pub fn lookup(id: &str) -> Option<&'static ShopItem> {
-    TITLES.iter().map(|t| &t.item)
-        .chain(COLORWAYS.iter().map(|c| &c.item))
-        .chain(LOOTBOX_POOL.iter().map(|b| &b.item))
-        .chain(UNLOCKS.iter())
-        .chain(std::iter::once(&LOOTBOX_ITEM))
-        .find(|i| i.id == id)
-}
 
 /// Find a title definition by ID (includes rarity / cost / description).
 pub fn lookup_title(id: &str) -> Option<&'static TitleDef> {
@@ -334,9 +309,6 @@ pub fn lookup_colorway(id: &str) -> Option<&'static ColorwayDef> {
 pub fn lookup_badge(id: &str) -> Option<&'static BadgeDef> {
     LOOTBOX_POOL.iter().find(|b| b.item.id == id)
 }
-
-/// Pretty-print the custom-title max length for help messages.
-pub fn custom_title_max_len() -> usize { MAX_CUSTOM_TITLE_LEN }
 
 // ---------------------------------------------------------------------------
 // Achievements (Phase 7)

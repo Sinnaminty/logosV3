@@ -70,7 +70,6 @@ pub fn error_handler(
                 FullEvent::Message { new_message } => match error {
                     PawthosErrors::Mimic(MimicError::NoActiveMimic) => {
                         let user_id = new_message.author.id;
-                        // no error to be found here..
                         let _ = framework
                             .user_data
                             .with_mimic_user_write(user_id, |user| {

@@ -92,7 +92,6 @@ pub async fn add(
         format!("Event {} @ {} Added to your schedule!", name, local_dt),
     );
 
-    // no error here.. carry on
     let event = ctx
         .data()
         .with_schedule_user_write(user_id, |user| {

@@ -40,7 +40,6 @@ impl ScheduleUser {
         };
 
         self.events.push(event.clone());
-        // bruh
         self.events.sort_by_key(|e| e.when);
         event
     }

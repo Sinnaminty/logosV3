@@ -137,34 +137,20 @@ fn resolve_banner(profile: &ProfileUser) -> Option<String> {
 
 /// Render the Badges field on `/profile view`.
 ///
-/// Priority:
-/// 1. `active_badge_ids` — pinned slots, each resolved via
-///    [`shop_catalog::resolve_badge_display`]. Any ID the user no longer
-///    owns or that no longer exists in the catalog is silently dropped.
-/// 2. Legacy `profile.badges` — only shown if `active_badge_ids` is empty,
-///    so users who never pinned anything still see their old manual badges.
-/// 3. `"None"` otherwise.
+/// Iterates `active_badge_ids` (the pinned slots), resolving each via
+/// [`shop_catalog::resolve_badge_display`]. IDs the user no longer owns or
+/// that no longer match a catalog entry are silently dropped. Returns
+/// `"None"` if the user has nothing to show.
 fn render_active_badges(profile: &ProfileUser, inventory: &InventoryUser) -> String {
-    if !profile.active_badge_ids.is_empty() {
-        let rendered: Vec<String> = profile
-            .active_badge_ids
-            .iter()
-            .filter(|id| inventory.owned_badges.iter().any(|o| o == *id))
-            .filter_map(|id| {
-                shop_catalog::resolve_badge_display(id).map(|(e, n)| format!("{e} {n}"))
-            })
-            .collect();
-        if !rendered.is_empty() {
-            return rendered.join(" · ");
-        }
+    let rendered: Vec<String> = profile
+        .active_badge_ids
+        .iter()
+        .filter(|id| inventory.owned_badges.iter().any(|o| o == *id))
+        .filter_map(|id| shop_catalog::resolve_badge_display(id).map(|(e, n)| format!("{e} {n}")))
+        .collect();
+    if rendered.is_empty() {
+        "None".to_string()
+    } else {
+        rendered.join(" · ")
     }
-    if !profile.badges.is_empty() {
-        return profile
-            .badges
-            .iter()
-            .map(|b| b.to_string())
-            .collect::<Vec<_>>()
-            .join(" ");
-    }
-    "None".to_string()
 }

@@ -145,16 +145,12 @@ fn load_wallet_list() -> Result<WalletList, Error> {
 /// Check whether user `id` has already claimed their daily reward today, and
 /// if not, mark them as having claimed it.
 ///
-/// The wallet list resets when its stored `date` is earlier than today. All
-/// I/O is synchronous because this runs inside the single-threaded persistence
-/// task loop (no async needed, no risk of concurrent access).
+/// The list resets when its stored `date` is earlier than today. All I/O is
+/// synchronous because this runs inside the single-threaded persistence task
+/// loop (no async needed, no risk of concurrent access).
 fn daily_check(id: u64) -> Result<UserDailyClaimed, Error> {
     let mut wallet_list = load_wallet_list()?;
 
-    // in our wallet list, we want to return Ok(false) if this user did not do their daily today
-    // and add them to the wallet list before saving
-    // if this user did their daily today, return Ok(true)
-    // or Err(e)
     let today = chrono::Local::now().date_naive();
     if wallet_list.date < today {
         wallet_list.list.clear();
@@ -229,7 +225,10 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
-            let http = ctx.http.clone(); // one.
+            // We need three handles to `ctx.http` for the spawned async tasks
+            // below: the cleanup task, the schedule reminder task, and the
+            // per-event sleep task. Each `.clone()` is just an Arc bump.
+            let http = ctx.http.clone();
 
             // --- Faucet state + cleanup task --------------------------------
             // Bounty state is purely in-memory: a bot restart forfeits any
@@ -261,10 +260,10 @@ pub fn setup_framework() -> poise::Framework<Data, Error> {
             let (send_tasks, mut recv_tasks) =
                 tokio::sync::mpsc::unbounded_channel::<(UserId, ScheduleEvent)>();
             tokio::spawn({
-                let http = http.clone(); // two.
+                let http = http.clone();
                 async move {
                     while let Some((id, event)) = recv_tasks.recv().await {
-                        let http = http.clone(); // three.
+                        let http = http.clone();
                         tokio::spawn(async move {
                             let now = chrono::Utc::now();
                             let Ok(time_delta) = event.when.signed_duration_since(now).to_std()

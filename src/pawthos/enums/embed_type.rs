@@ -6,9 +6,9 @@ use poise::serenity_prelude::Color;
 /// Semantic colour category for a Discord embed.
 ///
 /// Pass one of these variants to [`crate::utils::create_embed_builder`] (or use
-/// the higher-level [`crate::utils::reply_ok`] / [`crate::utils::reply_err`] /
-/// [`crate::utils::reply_info`] shortcuts) to give every embed a consistent
-/// accent colour.
+/// the higher-level [`crate::utils::reply_ok`] / [`crate::utils::reply_info`]
+/// shortcuts) to give every embed a consistent accent colour. Error replies
+/// flow through the Poise `on_error` hook, not through this enum directly.
 pub enum EmbedType {
     /// A successful operation — renders with [`LOGOS_GREEN`].
     Good,

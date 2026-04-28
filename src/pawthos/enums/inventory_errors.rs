@@ -44,10 +44,6 @@ pub enum InventoryError {
         max: usize,
     },
 
-    /// Reaction was added to a message that has no active faucet bounty.
-    #[error("No faucet bounty is active on that message.")]
-    NoFaucetBounty,
-
     /// Wrap wallet errors so purchase flows can use `?` uniformly.
     #[error(transparent)]
     Wallet(#[from] WalletError),

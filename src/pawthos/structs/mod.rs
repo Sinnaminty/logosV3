@@ -14,9 +14,8 @@
 //! | [`schedule_user`] | Per-user schedule state: timezone and event list |
 //! | [`user`] | Aggregates all per-user sub-structs into one [`user::User`] |
 //! | [`user_db`] | [`user_db::UserDB`] — the top-level `HashMap<UserId, User>` |
-//! | [`wallet_user`] | Per-user wallet state: tab balance and owned roles |
+//! | [`wallet_user`] | Per-user wallet state: tab balance and daily streak |
 
-pub mod badge;
 pub mod data;
 pub mod inventory_user;
 pub mod mimic;

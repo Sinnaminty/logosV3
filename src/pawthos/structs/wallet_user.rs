@@ -1,7 +1,6 @@
 //! Per-user state for the wallet/tab economy.
 
 use chrono::{Local, NaiveDate};
-use poise::serenity_prelude::Role;
 use serde::{Deserialize, Serialize};
 
 use crate::pawthos::consts::{DAILY_REWARD, MAX_STREAK_BONUS};
@@ -22,8 +21,10 @@ pub struct DailyClaimResult {
 
 /// All wallet-related state for a single user.
 ///
-/// "Tabs" are the in-server currency. Users earn them via `/daily` and spend
-/// them on features like `/color set`.
+/// "Tabs" are the in-server currency. Users earn them via `/daily` (with a
+/// streak bonus up to [`MAX_STREAK_BONUS`]) and the tab-reaction faucet, and
+/// spend them in the `/shop` and on per-set cosmetics like `/profile set
+/// banner` or `/shop buy rolecolor`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WalletUser {
     /// Current tab balance. Cannot go below zero (enforced by [`remove_tabs`]).
@@ -33,13 +34,6 @@ pub struct WalletUser {
     /// [`remove_tabs`]: WalletUser::remove_tabs
     #[serde(default)]
     pub tabs: i64,
-
-    /// Discord roles that the user purchased via `/color set`.
-    ///
-    /// Persisted so role ownership survives bot restarts (useful for future
-    /// reconciliation logic).
-    #[serde(default)]
-    pub owned_roles: Vec<Role>,
 
     /// How many consecutive days the user has claimed `/daily` without missing
     /// a day. Resets to 0 on a missed day.
