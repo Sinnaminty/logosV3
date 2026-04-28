@@ -151,7 +151,7 @@ pub enum InventoryError {
 }
 ```
 
-Add `#[from]` variant to `PawthosErrors`.
+Add `#[from]` variant to `PawthosError`.
 
 ### New consts
 
