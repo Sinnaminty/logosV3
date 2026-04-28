@@ -35,9 +35,7 @@ Read `README.md` ("Architecture notes" + "Project structure") first — it's acc
 | `ProfileUser` | `profile` | `/profile` (bio, banner, colorway, equipped items) |
 | `InventoryUser` | `inventory` | `/shop`, `/achievements` |
 
-Profile + shop are an in-flight expansion. `SHOP_PLAN.md` is the original phased blueprint (Phases 0–3 and 5–8 landed); `SHOP_IDEAS.md` is the design intent. Phase 4 was scrapped — the curated banner catalog was replaced with user-supplied banners that charge per-set, and `/color set` was folded into `/shop buy rolecolor` and `/shop buy rolename`. **`BANNER_AND_ROLE_REFACTOR.md`** is the source of truth for that refactor; treat it as load-bearing for any new banner/role work.
-
-**Per-use cosmetics that charge tabs but do *not* grant catalog items:** `/profile set banner` (`BANNER_SET_COST`), `/profile set colorway <hex>` (`CUSTOM_COLORWAY_SET_COST`), `/shop buy rolecolor <hex>` (`ROLE_COLOR_COST`), `/shop buy rolename <text>` (`ROLE_NAME_COST`). Equipping an *owned* named colorway via `/profile set namedcolorway` is free; only setting a custom hex costs.
+**Per-use cosmetics that charge tabs but do *not* grant catalog items:** `/profile set banner` (`BANNER_SET_COST`), `/profile set colorway <hex>` (`CUSTOM_COLORWAY_SET_COST`), `/shop buy rolecolor <hex>` (`ROLE_COLOR_COST`), `/shop buy rolename <text>` (`ROLE_NAME_COST`). Equipping an *owned* named colorway via `/profile set namedcolorway` is free; only setting a custom hex costs. Banners are user-supplied URL/attachment — there is no banner catalog.
 
 ## Invariants
 
@@ -53,4 +51,4 @@ Profile + shop are an in-flight expansion. `SHOP_PLAN.md` is the original phased
 
 Stable: `pawthos/structs/data.rs` macro pair, `traits/mod.rs` markers, `utils.rs` reply helpers, the persistence task in `framework.rs`. Treat these as load-bearing — small changes ripple.
 
-Volatile: `commands/shop/`, `commands/profile/`, `pawthos/structs/{shop_catalog,inventory_user,profile_user}.rs`. These are still under active iteration — the most recent change was the banner+role refactor (see `BANNER_AND_ROLE_REFACTOR.md`).
+Volatile: `commands/shop/`, `commands/profile/`, `pawthos/structs/{shop_catalog,inventory_user,profile_user}.rs`. The shop and per-use cosmetic surface is shipped; further iteration here is likely (catalog growth, new cosmetic types).

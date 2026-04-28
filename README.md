@@ -169,14 +169,6 @@ The same `Message` handler rolls a per-message chance (`FAUCET_TRIGGER_CHANCE` i
 
 ---
 
-## Roadmap
-
-The shop is an in-flight expansion. **`SHOP_PLAN.md`** is the phased blueprint (Phases 0–8); **`SHOP_IDEAS.md`** is the design intent.
-
-Phase 4 (curated banner catalog) was scrapped in favour of user-supplied banners with a per-set tab charge. The `/color set` flow likewise moved into `/shop buy rolecolor` and `/shop buy rolename`. See **`BANNER_AND_ROLE_REFACTOR.md`** for the full refactor plan and decisions.
-
----
-
 ## Adding a new feature
 
 ### Simple slash command (no database)

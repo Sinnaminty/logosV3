@@ -12,7 +12,8 @@
 //!
 //! Steps 2 and 3 are not atomic across the two sub-struct writes, but both
 //! operate on the same in-memory `UserDB` so the window is vanishingly small.
-//! See `SHOP_PLAN.md` § "Locking discipline" for the long-term mitigation.
+//! A long-term mitigation would coalesce the two writes under a single
+//! lock acquisition.
 
 use crate::pawthos::{
     consts::{
